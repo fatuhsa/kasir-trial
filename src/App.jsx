@@ -169,9 +169,112 @@ function App() {
     };
     testConnection();
 
+    const sub = sb.channel('app-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'active_sessions' }, payload => {
+        if (payload.eventType === 'INSERT') {
+          const s = {
+            id: payload.new.id,
+            nama: payload.new.nama,
+            items: payload.new.items || [],
+            startTime: payload.new.start_time || Date.now(),
+            payAwal: payload.new.pay_awal || 'cash'
+          };
+          setActiveSessions(prev => {
+            if (prev.some(x => x.id === s.id)) return prev;
+            const next = [...prev, s];
+            localStorage.setItem('kw_sessions', JSON.stringify(next));
+            return next;
+          });
+        } else if (payload.eventType === 'UPDATE') {
+          const s = {
+            id: payload.new.id,
+            nama: payload.new.nama,
+            items: payload.new.items || [],
+            startTime: payload.new.start_time || Date.now(),
+            payAwal: payload.new.pay_awal || 'cash'
+          };
+          setActiveSessions(prev => {
+            const next = prev.some(x => x.id === s.id) ? prev.map(x => x.id === s.id ? s : x) : [...prev, s];
+            localStorage.setItem('kw_sessions', JSON.stringify(next));
+            return next;
+          });
+        } else if (payload.eventType === 'DELETE') {
+          setActiveSessions(prev => {
+            const next = prev.filter(x => x.id !== payload.old.id);
+            localStorage.setItem('kw_sessions', JSON.stringify(next));
+            return next;
+          });
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, payload => {
+        if (payload.eventType === 'INSERT') {
+          const t = {
+            id: payload.new.id,
+            no: payload.new.no || 0,
+            nama: payload.new.nama,
+            tanggal: payload.new.tanggal,
+            startTime: payload.new.start_time || 0,
+            endTime: payload.new.end_time || 0,
+            items: payload.new.items,
+            ot: payload.new.ot || '-',
+            otDur: payload.new.ot_dur || '-',
+            totalBase: payload.new.total_base || 0,
+            totalOT: payload.new.total_ot || 0,
+            totalTol: payload.new.total_tol || 0,
+            grandTotal: payload.new.grand_total || 0,
+            totalAll: payload.new.total_all || ((payload.new.total_base || 0) + (payload.new.grand_total || 0)),
+            payAwal: payload.new.pay_awal || 'cash',
+            cash: payload.new.cash || 0,
+            qris: payload.new.qris || 0,
+            shift: payload.new.shift || '-'
+          };
+          setTransactions(prev => {
+            if (prev.some(x => x.id === t.id)) return prev;
+            const next = [...prev, t].sort((a, b) => (a.no || 0) - (b.no || 0));
+            localStorage.setItem('kw_txns', JSON.stringify(next));
+            return next;
+          });
+        } else if (payload.eventType === 'UPDATE') {
+          const t = {
+            id: payload.new.id,
+            no: payload.new.no || 0,
+            nama: payload.new.nama,
+            tanggal: payload.new.tanggal,
+            startTime: payload.new.start_time || 0,
+            endTime: payload.new.end_time || 0,
+            items: payload.new.items,
+            ot: payload.new.ot || '-',
+            otDur: payload.new.ot_dur || '-',
+            totalBase: payload.new.total_base || 0,
+            totalOT: payload.new.total_ot || 0,
+            totalTol: payload.new.total_tol || 0,
+            grandTotal: payload.new.grand_total || 0,
+            totalAll: payload.new.total_all || ((payload.new.total_base || 0) + (payload.new.grand_total || 0)),
+            payAwal: payload.new.pay_awal || 'cash',
+            cash: payload.new.cash || 0,
+            qris: payload.new.qris || 0,
+            shift: payload.new.shift || '-'
+          };
+          setTransactions(prev => {
+            const next = prev.some(x => x.id === t.id) ? prev.map(x => x.id === t.id ? t : x) : [...prev, t];
+            const sorted = next.sort((a, b) => (a.no || 0) - (b.no || 0));
+            localStorage.setItem('kw_txns', JSON.stringify(sorted));
+            return sorted;
+          });
+        } else if (payload.eventType === 'DELETE') {
+          setTransactions(prev => {
+            const next = prev.filter(x => x.id !== payload.old.id);
+            localStorage.setItem('kw_txns', JSON.stringify(next));
+            return next;
+          });
+        }
+      })
+      .subscribe();
+
     return () => {
       window.removeEventListener('hashchange', checkHash);
       clearInterval(interval);
+      sb.removeChannel(sub);
     };
   }, []);
 

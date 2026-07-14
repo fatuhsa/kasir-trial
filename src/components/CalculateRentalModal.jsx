@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { ITEMS, fmtRp, fmtDur } from '../App';
 
 function CalculateRentalModal({ session, onClose, onProceedPayment }) {
-  const [elapsed, setElapsed] = useState(0);
-  const [elapsedMin, setElapsedMin] = useState(0);
+  const [elapsed, setElapsed] = useState(() => Math.floor((Date.now() - session.startTime) / 1000));
+  const [elapsedMin, setElapsedMin] = useState(() => Math.floor((Date.now() - session.startTime) / 1000) / 60);
   const [itemsCalc, setItemsCalc] = useState([]);
   const [manualAdj, setManualAdj] = useState(0);
 
@@ -49,13 +49,26 @@ function CalculateRentalModal({ session, onClose, onProceedPayment }) {
   const handleTolToggle = (idx, checked) => {
     setItemsCalc(prev => prev.map((it, i) => {
       if (i !== idx) return it;
-      return {
-        ...it,
-        tolOn: checked,
-        otFullCount: checked ? 0 : it.bakFull,
-        otHalfCount: checked ? 0 : it.bakHalf,
-        otCost: checked ? 0 : it.bakCost
-      };
+      if (checked) {
+        return {
+          ...it,
+          tolOn: true,
+          bakFull: it.otFullCount,
+          bakHalf: it.otHalfCount,
+          bakCost: it.otCost,
+          otFullCount: 0,
+          otHalfCount: 0,
+          otCost: 0
+        };
+      } else {
+        return {
+          ...it,
+          tolOn: false,
+          otFullCount: it.bakFull,
+          otHalfCount: it.bakHalf,
+          otCost: it.bakCost
+        };
+      }
     }));
   };
 

@@ -21,8 +21,11 @@ const dateStr = ts => {
 const timeStr = ts => new Date(ts).toTimeString().slice(0,5);
 
 function HistoryTab({ transactions, onDeleteTxn }) {
-  const today = new Date().toISOString().slice(0, 10);
-  const [filterDate, setFilterDate] = useState(today);
+  const getLocalDateString = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const [filterDate, setFilterDate] = useState(getLocalDateString);
 
   const filtered = transactions.filter(t => t.tanggal === filterDate);
 
