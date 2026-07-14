@@ -2,7 +2,15 @@ import React, { useState, useEffect } from 'react';
 import LoginPage from './components/LoginPage';
 import { sb } from './supabase';
 import DashboardTab from './components/DashboardTab';
+import HistoryTab from './components/HistoryTab';
+import SettingsTab from './components/SettingsTab';
 import FooterNav from './components/FooterNav';
+
+import CalculateRentalModal from './components/CalculateRentalModal';
+import PaymentModal from './components/PaymentModal';
+import PasswordVerificationModal from './components/PasswordVerificationModal';
+import QRCodeModal from './components/QRCodeModal';
+import EditActiveSessionModal from './components/EditActiveSessionModal';
 
 export const ITEMS = [
   { code:'ST',  name:'Stroller',          emoji:'🛺', defaultImg:'https://i.ibb.co.com/fzwMy2XL/The-Edit-The-stroller-changing-the-game-banner-desktop.webp', priceHour:20000, priceOT30:10000, priceOT60:20000 },
@@ -32,8 +40,20 @@ function App() {
   const [liveTime, setLiveTime] = useState('00:00:00');
   const [liveDate, setLiveDate] = useState('—');
 
+  // Modals Visibility
+  const [activeCheckoutSession, setActiveCheckoutSession] = useState(null);
+  const [activePaymentData, setActivePaymentData] = useState(null);
+  const [activeQRModalSession, setActiveQRModalSession] = useState(null);
+  const [activeEditSession, setActiveEditSession] = useState(null);
+  const [pendingAction, setPendingAction] = useState(null);
+
+  // Settings states
+  const [printMulai, setPrintMulai] = useState(false);
+  const [printSelesai, setPrintSelesai] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState('');
+  const [imageUpdateTrigger, setImageUpdateTrigger] = useState(0);
+
   const handleLogin = (user) => {
-    // Find proper capitalization
     const cName = user.charAt(0).toUpperCase() + user.slice(1);
     setCurrentShiftUser(cName);
     localStorage.setItem('kw_currentUser', cName);
@@ -58,8 +78,11 @@ function App() {
       const t = localStorage.getItem('kw_txns');
       if (t) setTransactions(JSON.parse(t));
     } catch(e) {}
+    
     setAdminPassword(localStorage.getItem('kw_pass') || 'admin');
     setShiftQueueNo(parseInt(localStorage.getItem('kw_shiftQNo') || '0'));
+    setPrintMulai(localStorage.getItem('kw_printMulai') === 'true');
+    setPrintSelesai(localStorage.getItem('kw_printSelesai') === 'true');
 
     const savedTheme = localStorage.getItem('kw_theme') || 'dark';
     setTheme(savedTheme);
@@ -89,10 +112,62 @@ function App() {
       setLiveTime(now.toTimeString().slice(0, 8));
       const days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
       const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
-      setLiveDate(`${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`);
+      setLiveDate(`${days[now.getDay()]} , ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`);
     };
     tick();
     const interval = setInterval(tick, 1000);
+
+    // Supabase Auto-Connect
+    const testConnection = async () => {
+      try {
+        const { error } = await sb.from('settings').select('*').limit(1).abortSignal(AbortSignal.timeout(5000));
+        if (error) throw error;
+        setSbConnected(true);
+        // Load data from Supabase silently on start
+        const { data: txns } = await sb.from('transactions').select('*').order('no', { ascending: true }).limit(5000);
+        if (txns) {
+          const ct = txns.map(row => ({
+            id: row.id,
+            no: row.no || 0,
+            nama: row.nama,
+            tanggal: row.tanggal,
+            startTime: row.start_time || 0,
+            endTime: row.end_time || 0,
+            items: row.items,
+            ot: row.ot || '-',
+            otDur: row.ot_dur || '-',
+            totalBase: row.total_base || 0,
+            totalOT: row.total_ot || 0,
+            totalTol: row.total_tol || 0,
+            grandTotal: row.grand_total || 0,
+            totalAll: row.total_all || ((row.total_base || 0) + (row.grand_total || 0)),
+            payAwal: row.pay_awal || 'cash',
+            cash: row.cash || 0,
+            qris: row.qris || 0,
+            shift: row.shift || '-'
+          }));
+          setTransactions(ct);
+          localStorage.setItem('kw_txns', JSON.stringify(ct));
+        }
+
+        const { data: sess } = await sb.from('active_sessions').select('*');
+        if (sess) {
+          const cs = sess.map(row => ({
+            id: row.id,
+            nama: row.nama,
+            items: row.items || [],
+            startTime: row.start_time || Date.now(),
+            payAwal: row.pay_awal || 'cash'
+          }));
+          setActiveSessions(cs);
+          localStorage.setItem('kw_sessions', JSON.stringify(cs));
+        }
+      } catch (err) {
+        console.error('Supabase auto connect failed:', err);
+        setSbConnected(false);
+      }
+    };
+    testConnection();
 
     return () => {
       window.removeEventListener('hashchange', checkHash);
@@ -100,16 +175,293 @@ function App() {
     };
   }, []);
 
-  if (isTrackingMode) {
-    return (
-      <div id="trackingPage">
-        <div className="track-body" style={{ color: 'white', padding: '40px' }}>
-          <h2>Tracking Sesi: {trackingId}</h2>
-          <p>Fitur tracking akan dikembangkan pada task selanjutnya.</p>
+  const handleSyncPull = async () => {
+    try {
+      // Pull transactions
+      const { data: txns, error: errT } = await sb.from('transactions').select('*').order('no', { ascending: true }).limit(5000);
+      if (errT) throw errT;
+      let mergedTxns = [...transactions];
+      if (txns) {
+        mergedTxns = txns.map(row => ({
+          id: row.id,
+          no: row.no || 0,
+          nama: row.nama,
+          tanggal: row.tanggal,
+          startTime: row.start_time || 0,
+          endTime: row.end_time || 0,
+          items: row.items,
+          ot: row.ot || '-',
+          otDur: row.ot_dur || '-',
+          totalBase: row.total_base || 0,
+          totalOT: row.total_ot || 0,
+          totalTol: row.total_tol || 0,
+          grandTotal: row.grand_total || 0,
+          totalAll: row.total_all || ((row.total_base || 0) + (row.grand_total || 0)),
+          payAwal: row.pay_awal || 'cash',
+          cash: row.cash || 0,
+          qris: row.qris || 0,
+          shift: row.shift || '-'
+        }));
+        setTransactions(mergedTxns);
+        localStorage.setItem('kw_txns', JSON.stringify(mergedTxns));
+      }
+
+      // Pull active sessions
+      const { data: sess, error: errS } = await sb.from('active_sessions').select('*');
+      if (errS) throw errS;
+      let mergedSessions = [...activeSessions];
+      if (sess) {
+        mergedSessions = sess.map(row => ({
+          id: row.id,
+          nama: row.nama,
+          items: row.items || [],
+          startTime: row.start_time || Date.now(),
+          payAwal: row.pay_awal || 'cash'
+        }));
+        setActiveSessions(mergedSessions);
+        localStorage.setItem('kw_sessions', JSON.stringify(mergedSessions));
+      }
+
+      // Pull settings
+      const { data: sett, error: errSet } = await sb.from('settings').select('*');
+      if (errSet) throw errSet;
+      if (sett) {
+        sett.forEach(s => {
+          if (s.key === 'adminPassword') {
+            setAdminPassword(s.value);
+            localStorage.setItem('kw_pass', s.value);
+          }
+          if (s.key === 'theme') {
+            setTheme(s.value);
+            localStorage.setItem('kw_theme', s.value);
+            document.documentElement.setAttribute('data-theme', s.value);
+          }
+          if (s.key === 'printMulai') {
+            setPrintMulai(s.value === 'true');
+            localStorage.setItem('kw_printMulai', s.value);
+          }
+          if (s.key === 'printSelesai') {
+            setPrintSelesai(s.value === 'true');
+            localStorage.setItem('kw_printSelesai', s.value);
+          }
+        });
+      }
+
+      // Pull images
+      const { data: imgs, error: errI } = await sb.from('item_images').select('*');
+      if (errI) throw errI;
+      if (imgs) {
+        imgs.forEach(doc => {
+          if (doc.code && doc.image_data) {
+            localStorage.setItem('kw_img_' + doc.code, doc.image_data);
+          }
+        });
+      }
+
+      setLastSyncTime(new Date().toLocaleTimeString('id-ID'));
+      alert('Data ditarik dari cloud!');
+    } catch (err) {
+      console.error(err);
+      alert('Gagal tarik data: ' + err.message);
+    }
+  };
+
+  const handleSyncPush = async () => {
+    if (!sbConnected) {
+      alert('Tidak terhubung ke Supabase!');
+      return;
+    }
+    try {
+      if (transactions.length > 0) {
+        const rows = transactions.map(t => ({
+          id: t.id,
+          no: t.no || 0,
+          nama: t.nama,
+          tanggal: t.tanggal,
+          start_time: t.startTime,
+          end_time: t.endTime,
+          items: t.items,
+          ot: t.ot || '-',
+          ot_dur: t.otDur || '-',
+          total_base: t.totalBase || 0,
+          total_ot: t.totalOT || 0,
+          total_tol: t.totalTol || 0,
+          grand_total: t.grandTotal || 0,
+          total_all: t.totalAll || ((t.totalBase || 0) + (t.grandTotal || 0)),
+          pay_awal: t.payAwal || 'cash',
+          cash: t.cash || 0,
+          qris: t.qris || 0,
+          shift: t.shift || '-'
+        }));
+        await sb.from('transactions').upsert(rows);
+      }
+
+      if (activeSessions.length > 0) {
+        const rows = activeSessions.map(s => ({
+          id: s.id,
+          nama: s.nama,
+          items: s.items,
+          start_time: s.startTime,
+          pay_awal: s.payAwal || 'cash'
+        }));
+        await sb.from('active_sessions').upsert(rows);
+      }
+
+      await sb.from('settings').upsert([
+        { key: 'adminPassword', value: adminPassword },
+        { key: 'theme', value: theme },
+        { key: 'printMulai', value: String(printMulai) },
+        { key: 'printSelesai', value: String(printSelesai) }
+      ]);
+
+      const imgData = [];
+      ITEMS.forEach(item => {
+        const img = localStorage.getItem('kw_img_' + item.code);
+        if (img) {
+          imgData.push({ code: item.code, image_data: img });
+        }
+      });
+      if (imgData.length > 0) {
+        await sb.from('item_images').upsert(imgData);
+      }
+
+      setLastSyncTime(new Date().toLocaleTimeString('id-ID'));
+      alert('Data didorong ke cloud!');
+    } catch (err) {
+      console.error(err);
+      alert('Gagal dorong data: ' + err.message);
+    }
+  };
+
+  const handleUpdateItemImg = (code, url) => {
+    localStorage.setItem('kw_img_' + code, url);
+    setImageUpdateTrigger(prev => prev + 1);
+    if (sbConnected) {
+      sb.from('item_images').upsert({ code, image_data: url }).then(() => {
+        console.log('Image synced to Supabase');
+      });
+    }
+  };
+
+  const handleResetItemImg = (code) => {
+    localStorage.removeItem('kw_img_' + code);
+    setImageUpdateTrigger(prev => prev + 1);
+    if (sbConnected) {
+      sb.from('item_images').delete().eq('code', code).then(() => {
+        console.log('Image deleted from Supabase');
+      });
+    }
+  };
+
+  const triggerPrintReceipt = (html, qrText) => {
+    const area = document.getElementById('printArea');
+    if (!area) return;
+    area.innerHTML = html;
+    area.style.display = 'block';
+
+    setTimeout(() => {
+      const qrEl = area.querySelector('#printQrCode');
+      if (qrEl && qrText && typeof window.QRCode !== 'undefined') {
+        new window.QRCode(qrEl, { text: qrText, width: 120, height: 120, colorDark: '#000000', colorLight: '#ffffff', correctLevel: window.QRCode.CorrectLevel.M });
+      }
+      setTimeout(() => {
+        window.print();
+        setTimeout(() => {
+          area.style.display = 'none';
+        }, 100);
+      }, 500);
+    }, 100);
+  };
+
+  const handlePrintMulai = (session) => {
+    const itemsText = session.items.map(i => { 
+      const d = ITEMS.find(item => item.code === i.code); 
+      if (!d) return `${i.code} x${i.qty}`;
+      return `${i.code} - ${d.name} x${i.qty}  ${fmtRp(d.priceHour * i.qty)}`; 
+    }).join('\n');
+
+    const total = session.items.reduce((s, i) => {
+      const d = ITEMS.find(item => item.code === i.code);
+      return s + (d ? d.priceHour * i.qty : 0);
+    }, 0);
+
+    const trackUrl = window.location.href.split('#')[0] + '#track/' + session.id;
+
+    const dateStr = ts => { 
+      const d = new Date(ts); 
+      return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`; 
+    };
+    const timeStr = ts => new Date(ts).toTimeString().slice(0,5);
+
+    const html = `
+      <div class="receipt-mono">
+        <div class="rc rb" style="font-size:13px">EVREN HOUSE</div>
+        <div class="rc">Scooter &amp; Stroller</div>
+        <div class="rc">Struk Mulai Sewa</div>
+        <hr>
+        <div>Queue Number: ${session.queueNo || 0}</div>
+        <div>Tgl: ${dateStr(session.startTime)} | ${timeStr(session.startTime)}</div>
+        <div>Nama: ${session.nama}</div>
+        <div>Shift: ${currentShiftUser || '-'}</div>
+        <hr>
+        <pre style="font-size:11px;margin:0">${itemsText}</pre>
+        <hr>
+        <div class="rr rb"><span>Total Pokok:</span><span>${fmtRp(total)}</span></div>
+        <hr>
+        <div class="rc" style="margin:5px 0">
+          <div id="printQrCode" style="display:inline-block;background:#fff;padding:5px"></div>
+          <div style="font-size:9px;margin-top:4px">Scan QR untuk Cek Sisa Waktu</div>
         </div>
-      </div>
-    );
-  }
+        <hr>
+        <div class="rc" style="font-size:10px">Terima kasih!</div>
+      </div>`;
+
+    triggerPrintReceipt(html, trackUrl);
+  };
+
+  const handlePrintSelesai = (txn) => {
+    const trackUrl = window.location.href.split('#')[0] + '#track/' + txn.id;
+    const durSec = Math.floor((txn.endTime - txn.startTime) / 1000);
+
+    const dateStr = ts => { 
+      const d = new Date(ts); 
+      return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`; 
+    };
+    const timeStr = ts => new Date(ts).toTimeString().slice(0,5);
+
+    const html = `
+      <div class="receipt-mono">
+        <div class="rc rb" style="font-size:13px">EVREN HOUSE</div>
+        <div class="rc">Scooter &amp; Stroller</div>
+        <div class="rc">Struk Selesai Sewa</div>
+        <hr>
+        <div>Queue Number: ${txn.queueNo || 0}</div>
+        <div>No: ${txn.no} | ${dateStr(txn.endTime)}</div>
+        <div>Nama: ${txn.nama}</div>
+        <div>Shift: ${txn.shift || '-'}</div>
+        <div style="font-size:11px">Mulai: ${timeStr(txn.startTime)} | Selesai: ${timeStr(txn.endTime)}</div>
+        <div style="font-size:11px">Durasi: ${fmtDur(durSec)}</div>
+        <hr>
+        <div style="font-size:11px">Item: ${txn.items}</div>
+        ${txn.ot !== '-' ? `<div style="font-size:11px">OT: ${txn.ot}</div>` : ''}
+        <hr>
+        <div class="rr"><span>Sewa Pokok:</span><span>${fmtRp(txn.totalBase)} (${txn.payAwal.toUpperCase()})</span></div>
+        ${txn.totalOT > 0 ? `<div class="rr"><span>Overtime:</span><span>${fmtRp(txn.totalOT)}</span></div>` : ''}
+        <hr>
+        <div class="rr rb"><span>TOTAL:</span><span>${fmtRp(txn.totalAll)}</span></div>
+        ${txn.cash > 0 ? `<div class="rr"><span>Cash:</span><span>${fmtRp(txn.cash)}</span></div>` : ''}
+        ${txn.qris > 0 ? `<div class="rr"><span>QRIS:</span><span>${fmtRp(txn.qris)}</span></div>` : ''}
+        <hr>
+        <div class="rc" style="margin:5px 0">
+          <div id="printQrCode" style="display:inline-block;background:#fff;padding:5px"></div>
+          <div style="font-size:9px;margin-top:4px">Scan QR untuk Struk Digital</div>
+        </div>
+        <hr>
+        <div class="rc" style="font-size:10px">Terima kasih telah berkunjung!</div>
+      </div>`;
+
+    triggerPrintReceipt(html, trackUrl);
+  };
 
   const handleStartSewa = (nama, items, payAwal) => {
     const newQueueNo = shiftQueueNo + 1;
@@ -129,17 +481,194 @@ function App() {
     setActiveSessions(updated);
     localStorage.setItem('kw_sessions', JSON.stringify(updated));
 
-    // Supabase push logic (async)
-    sb.from('active_sessions').upsert({
-      id: session.id,
-      nama: session.nama,
-      items: session.items,
-      start_time: session.startTime,
-      pay_awal: session.payAwal
-    }).then(() => console.log('Sewa saved to Supabase'));
+    if (printMulai) {
+      handlePrintMulai(session);
+    }
+
+    if (sbConnected) {
+      sb.from('active_sessions').upsert({
+        id: session.id,
+        nama: session.nama,
+        items: session.items,
+        start_time: session.startTime,
+        pay_awal: session.payAwal
+      }).then(() => console.log('Sewa saved to Supabase'));
+    }
   };
 
-  const getImgUrl = (code) => localStorage.getItem('kw_img_' + code);
+  if (isTrackingMode) {
+    return (
+      <div id="trackingPage">
+        <div className="track-body" style={{ color: 'white', padding: '40px' }}>
+          <h2>Tracking Sesi: {trackingId}</h2>
+          <p>Fitur tracking akan dikembangkan pada task selanjutnya.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const getImgUrl = (code) => {
+    imageUpdateTrigger; // dependency tracking
+    return localStorage.getItem('kw_img_' + code);
+  };
+
+  const handleVerifySuccess = () => {
+    if (!pendingAction) return;
+
+    if (pendingAction.type === 'editSession') {
+      setActiveEditSession(pendingAction.session);
+      setPendingAction(null);
+    } else if (pendingAction.type === 'deleteTxn') {
+      if (window.confirm('Hapus transaksi ini?')) {
+        const id = pendingAction.id;
+        const updated = transactions.filter(t => t.id !== id);
+        setTransactions(updated);
+        localStorage.setItem('kw_txns', JSON.stringify(updated));
+        
+        if (sbConnected) {
+          sb.from('transactions').delete().eq('id', id).then(() => {
+            console.log('Deleted from Supabase');
+          });
+        }
+      }
+      setPendingAction(null);
+    }
+  };
+
+  const handleSaveEditedSession = (updatedSession) => {
+    const updatedSessions = activeSessions.map(s => s.id === updatedSession.id ? updatedSession : s);
+    setActiveSessions(updatedSessions);
+    localStorage.setItem('kw_sessions', JSON.stringify(updatedSessions));
+
+    if (sbConnected) {
+      sb.from('active_sessions')
+        .update({
+          nama: updatedSession.nama,
+          items: updatedSession.items,
+          pay_awal: updatedSession.payAwal
+        })
+        .eq('id', updatedSession.id)
+        .then(() => {
+          console.log('Updated active session in Supabase');
+        });
+    }
+
+    setActiveEditSession(null);
+    alert('Sesi diperbarui!');
+  };
+
+  const handleFinalizePayment = (cash, qris) => {
+    if (!activePaymentData) return;
+    const { session, itemsCalc, base, ot, tol, grand, otStr, otDurStr, elapsed, endTime } = activePaymentData;
+    const itemStr = session.items.map(i => `${i.code}×${i.qty}`).join(', ');
+    
+    const txn = {
+      id: session.id,
+      no: transactions.length + 1,
+      queueNo: session.queueNo || 0,
+      nama: session.nama,
+      tanggal: todayStr(),
+      startTime: session.startTime,
+      endTime,
+      items: itemStr,
+      ot: otStr || '-',
+      otDur: otDurStr || '-',
+      totalBase: base,
+      totalOT: ot,
+      totalTol: tol,
+      grandTotal: grand,
+      totalAll: base + grand,
+      payAwal: session.payAwal || 'cash',
+      cash,
+      qris,
+      shift: currentShiftUser || '-'
+    };
+
+    const newTxns = [...transactions, txn];
+    setTransactions(newTxns);
+    localStorage.setItem('kw_txns', JSON.stringify(newTxns));
+
+    const newSessions = activeSessions.filter(s => s.id !== session.id);
+    setActiveSessions(newSessions);
+    localStorage.setItem('kw_sessions', JSON.stringify(newSessions));
+
+    if (printSelesai) {
+      handlePrintSelesai(txn);
+    }
+
+    if (sbConnected) {
+      sb.from('active_sessions').delete().eq('id', session.id).then(() => {
+        sb.from('transactions').insert({
+          id: txn.id,
+          no: txn.no,
+          nama: txn.nama,
+          tanggal: txn.tanggal,
+          start_time: txn.startTime,
+          end_time: txn.endTime,
+          items: txn.items,
+          ot: txn.ot,
+          ot_dur: txn.otDur,
+          total_base: txn.totalBase,
+          total_ot: txn.totalOT,
+          total_tol: txn.totalTol,
+          grand_total: txn.grandTotal,
+          total_all: txn.totalAll,
+          pay_awal: txn.payAwal,
+          cash: txn.cash,
+          qris: txn.qris,
+          shift: txn.shift
+        }).then(() => console.log('Transaction logged to Supabase'));
+      });
+    }
+
+    setActivePaymentData(null);
+  };
+
+  const todayStr = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  const handleUpdateAdminPassword = (newPass) => {
+    setAdminPassword(newPass);
+    localStorage.setItem('kw_pass', newPass);
+    if (sbConnected) {
+      sb.from('settings').upsert({ key: 'adminPassword', value: newPass }).then(() => {
+        console.log('Admin password saved to Supabase');
+      });
+    }
+  };
+
+  const handleThemeChange = (newTheme) => {
+    setTheme(newTheme);
+    localStorage.setItem('kw_theme', newTheme);
+    document.documentElement.setAttribute('data-theme', newTheme);
+    if (sbConnected) {
+      sb.from('settings').upsert({ key: 'theme', value: newTheme }).then(() => {
+        console.log('Theme setting saved to Supabase');
+      });
+    }
+  };
+
+  const handlePrintMulaiToggle = (val) => {
+    setPrintMulai(val);
+    localStorage.setItem('kw_printMulai', String(val));
+    if (sbConnected) {
+      sb.from('settings').upsert({ key: 'printMulai', value: String(val) }).then(() => {
+        console.log('printMulai setting saved to Supabase');
+      });
+    }
+  };
+
+  const handlePrintSelesaiToggle = (val) => {
+    setPrintSelesai(val);
+    localStorage.setItem('kw_printSelesai', String(val));
+    if (sbConnected) {
+      sb.from('settings').upsert({ key: 'printSelesai', value: String(val) }).then(() => {
+        console.log('printSelesai setting saved to Supabase');
+      });
+    }
+  };
 
   if (!currentShiftUser) {
     return <LoginPage onLogin={handleLogin} />;
@@ -174,13 +703,39 @@ function App() {
             activeSessions={activeSessions}
             onStartSewa={handleStartSewa}
             getImgUrl={getImgUrl}
+            onSelesaiSewa={(session) => setActiveCheckoutSession(session)}
+            onShowQR={(session) => setActiveQRModalSession(session)}
+            onEditSesi={(session) => {
+              setPendingAction({ type: 'editSession', session });
+            }}
           />
         )}
         {activeTab === 'riwayat' && (
-          <div className="panel p-4 text-center">Riwayat Tab (Task selanjutnya)</div>
+          <HistoryTab
+            transactions={transactions}
+            onDeleteTxn={(id) => {
+              setPendingAction({ type: 'deleteTxn', id });
+            }}
+          />
         )}
         {activeTab === 'pengaturan' && (
-          <div className="panel p-4 text-center">Pengaturan Tab (Task selanjutnya)</div>
+          <SettingsTab
+            theme={theme}
+            onThemeChange={handleThemeChange}
+            adminPassword={adminPassword}
+            onUpdateAdminPassword={handleUpdateAdminPassword}
+            sbConnected={sbConnected}
+            lastSyncTime={lastSyncTime}
+            onSyncPull={handleSyncPull}
+            onSyncPush={handleSyncPush}
+            printMulai={printMulai}
+            onChangePrintMulai={handlePrintMulaiToggle}
+            printSelesai={printSelesai}
+            onChangePrintSelesai={handlePrintSelesaiToggle}
+            onUpdateItemImg={handleUpdateItemImg}
+            onResetItemImg={handleResetItemImg}
+            getImgUrl={getImgUrl}
+          />
         )}
       </div>
 
@@ -189,6 +744,48 @@ function App() {
         onTabChange={setActiveTab}
         activeCount={activeSessions.length}
       />
+
+      {activeCheckoutSession && (
+        <CalculateRentalModal
+          session={activeCheckoutSession}
+          onClose={() => setActiveCheckoutSession(null)}
+          onProceedPayment={(data) => {
+            setActiveCheckoutSession(null);
+            setActivePaymentData(data);
+          }}
+        />
+      )}
+
+      {activePaymentData && (
+        <PaymentModal
+          bayarData={activePaymentData}
+          onClose={() => setActivePaymentData(null)}
+          onFinalize={handleFinalizePayment}
+        />
+      )}
+
+      {pendingAction && (
+        <PasswordVerificationModal
+          adminPassword={adminPassword}
+          onClose={() => setPendingAction(null)}
+          onVerifySuccess={handleVerifySuccess}
+        />
+      )}
+
+      {activeQRModalSession && (
+        <QRCodeModal
+          session={activeQRModalSession}
+          onClose={() => setActiveQRModalSession(null)}
+        />
+      )}
+
+      {activeEditSession && (
+        <EditActiveSessionModal
+          session={activeEditSession}
+          onClose={() => setActiveEditSession(null)}
+          onSave={handleSaveEditedSession}
+        />
+      )}
     </div>
   );
 }

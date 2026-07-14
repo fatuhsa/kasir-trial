@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ITEMS, fmtRp, fmtDur } from '../App';
 
-function DashboardTab({ activeSessions, onStartSewa, getImgUrl }) {
+function DashboardTab({ activeSessions, onStartSewa, getImgUrl, onSelesaiSewa, onShowQR, onEditSesi }) {
   const [inputNama, setInputNama] = useState('');
   const [payAwal, setPayAwal] = useState('cash');
   const [selectedQty, setSelectedQty] = useState({});
@@ -180,11 +180,11 @@ function DashboardTab({ activeSessions, onStartSewa, getImgUrl }) {
                           <span className="aktif-timer">{fmtDur(elapsedSec)}</span>
                         </div>
                         <div className="aktif-footer">
-                          <button className="btn-selesai" onClick={() => alert('Checkout click')}>
+                          <button className="btn-selesai" onClick={() => onSelesaiSewa(s)}>
                             <i className="bi bi-stop-circle-fill me-1"></i>Selesai &amp; Bayar
                           </button>
-                          <button className="btn-qr-aktif"><i className="bi bi-qr-code"></i></button>
-                          <button className="btn-edit-aktif"><i className="bi bi-pencil-fill"></i></button>
+                          <button className="btn-qr-aktif" onClick={() => onShowQR(s)}><i className="bi bi-qr-code"></i></button>
+                          <button className="btn-edit-aktif" onClick={() => onEditSesi(s)}><i className="bi bi-pencil-fill"></i></button>
                           <span className={dotClass}></span>
                         </div>
                       </div>
