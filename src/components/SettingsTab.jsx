@@ -22,12 +22,22 @@ function SettingsTab({
   getImgUrl
 }) {
   const [newPassInput, setNewPassInput] = useState('');
+  const [oldPassInput, setOldPassInput] = useState('');
 
   const handleChangePass = () => {
-    const p = newPassInput.trim();
-    if (!p) return;
+    const oldP = oldPassInput.trim();
+    const newP = newPassInput.trim();
+    if (!newP || !oldP) {
+      alert('Masukkan password lama dan baru!');
+      return;
+    }
+    if (oldP !== adminPassword) {
+      alert('Password lama salah!');
+      return;
+    }
     if (window.confirm('Ubah password admin?')) {
-      onUpdateAdminPassword(p);
+      onUpdateAdminPassword(newP);
+      setOldPassInput('');
       setNewPassInput('');
     }
   };
@@ -173,16 +183,26 @@ function SettingsTab({
                 <div className="panel-head"><i className="bi bi-shield-lock-fill clr-red"></i><span>Password Admin</span></div>
                 <div className="panel-body">
                   <p className="text-secondary small mb-2">Current: <code>{'*'.repeat(adminPassword?.length || 0)}</code></p>
-                  <div className="input-group">
+                  <div className="d-flex flex-column gap-2">
                     <input 
                       type="password" 
-                      value={newPassInput}
-                      onChange={(e) => setNewPassInput(e.target.value)}
+                      value={oldPassInput}
+                      onChange={(e) => setOldPassInput(e.target.value)}
                       className="cfield flex-fill" 
-                      placeholder="Password baru..." 
+                      placeholder="Password lama..." 
                       style={{ paddingLeft: '12px' }}
                     />
-                    <button className="btn-sec ms-2 py-2 px-3 border rounded text-white" style={{ background: 'var(--bg-sec)' }} onClick={handleChangePass}>Ubah</button>
+                    <div className="input-group">
+                      <input 
+                        type="password" 
+                        value={newPassInput}
+                        onChange={(e) => setNewPassInput(e.target.value)}
+                        className="cfield flex-fill" 
+                        placeholder="Password baru..." 
+                        style={{ paddingLeft: '12px' }}
+                      />
+                      <button className="btn-sec ms-2 py-2 px-3 border rounded text-white" style={{ background: 'var(--bg-sec)' }} onClick={handleChangePass}>Ubah</button>
+                    </div>
                   </div>
                 </div>
               </div>
