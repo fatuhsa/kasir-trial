@@ -177,7 +177,8 @@ function App() {
             nama: payload.new.nama,
             items: payload.new.items || [],
             startTime: payload.new.start_time || Date.now(),
-            payAwal: payload.new.pay_awal || 'cash'
+            payAwal: payload.new.pay_awal || 'cash',
+            queueNo: payload.new.queue_no || 0
           };
           setActiveSessions(prev => {
             if (prev.some(x => x.id === s.id)) return prev;
@@ -191,7 +192,8 @@ function App() {
             nama: payload.new.nama,
             items: payload.new.items || [],
             startTime: payload.new.start_time || Date.now(),
-            payAwal: payload.new.pay_awal || 'cash'
+            payAwal: payload.new.pay_awal || 'cash',
+            queueNo: payload.new.queue_no || 0
           };
           setActiveSessions(prev => {
             const next = prev.some(x => x.id === s.id) ? prev.map(x => x.id === s.id ? s : x) : [...prev, s];
@@ -572,7 +574,7 @@ function App() {
     localStorage.setItem('kw_shiftQNo', newQueueNo);
 
     const session = {
-      id: Math.random().toString(36).substring(2, 11),
+      id: crypto.randomUUID(),
       nama,
       items,
       startTime: Date.now(),
@@ -594,8 +596,12 @@ function App() {
         nama: session.nama,
         items: session.items,
         start_time: session.startTime,
-        pay_awal: session.payAwal
-      }).then(() => console.log('Sewa saved to Supabase'));
+        pay_awal: session.payAwal,
+        queue_no: session.queueNo
+      }).then(({ error }) => {
+        if (error) console.error('Supabase upsert session error:', error);
+        else console.log('Sewa saved to Supabase');
+      });
     }
   };
 
