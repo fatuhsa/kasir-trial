@@ -156,11 +156,22 @@ function DashboardTab({ activeSessions, onStartSewa, getImgUrl, onSelesaiSewa, o
                     if (overMin > 25) dotClass = 'dot dot-hot';
                     else if (overMin > 10) dotClass = 'dot dot-warn';
 
+                    // Zombie session warning: active > 8 hours
+                    const isZombie = elapsedSec > 28800;
+
                     return (
                       <div className="aktif-card" key={s.id}>
                         <div className="d-flex align-items-center justify-content-between mb-1 gap-2" style={{ minWidth: 0 }}>
                           <div className="aktif-name" style={{ marginBottom: 0 }}>
                             <i className="bi bi-person-fill me-1 clr-cyan"></i>{s.nama}
+                            {isZombie && (
+                              <span title="Sesi sudah lebih dari 8 jam!" style={{
+                                marginLeft: 6, fontSize: '.6rem', fontWeight: 800,
+                                background: 'rgba(249,115,22,.2)', color: 'var(--orange)',
+                                border: '1px solid rgba(249,115,22,.4)',
+                                borderRadius: 4, padding: '1px 5px'
+                              }}>⚠️ ZOMBIE</span>
+                            )}
                           </div>
                           <span className={`aktif-pay-badge ${s.payAwal}`}>
                             <i className={`bi ${s.payAwal === 'qris' ? 'bi-qr-code-scan' : 'bi-cash-stack'}`}></i>

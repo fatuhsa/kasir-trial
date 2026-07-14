@@ -26,6 +26,28 @@ export const fmtDur = s => {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
 };
 
+// localStorage guard — catches QuotaExceededError, prunes kw_txns if full
+export const safeSetItem = (key, value) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    if (e.name === 'QuotaExceededError' || e.code === 22) {
+      console.warn('localStorage quota exceeded, pruning old transactions...');
+      try {
+        const txns = JSON.parse(localStorage.getItem('kw_txns') || '[]');
+        // Keep last 200 transactions only
+        const pruned = txns.slice(-200);
+        safeSetItem('kw_txns', JSON.stringify(pruned));
+        localStorage.setItem(key, value);
+      } catch (e2) {
+        console.error('localStorage full even after pruning:', e2);
+      }
+    } else {
+      console.error('localStorage setItem failed:', e);
+    }
+  }
+};
+
 function App() {
   const [activeSessions, setActiveSessions] = useState([]);
   const [transactions, setTransactions] = useState([]);
@@ -148,7 +170,7 @@ function App() {
             shift: row.shift || '-'
           }));
           setTransactions(ct);
-          localStorage.setItem('kw_txns', JSON.stringify(ct));
+          safeSetItem('kw_txns', JSON.stringify(ct));
         }
 
         const { data: sess } = await sb.from('active_sessions').select('*');
@@ -161,7 +183,7 @@ function App() {
             payAwal: row.pay_awal || 'cash'
           }));
           setActiveSessions(cs);
-          localStorage.setItem('kw_sessions', JSON.stringify(cs));
+          safeSetItem('kw_sessions', JSON.stringify(cs));
         }
       } catch (err) {
         console.error('Supabase auto connect failed:', err);
@@ -184,7 +206,7 @@ function App() {
           setActiveSessions(prev => {
             if (prev.some(x => x.id === s.id)) return prev;
             const next = [...prev, s];
-            localStorage.setItem('kw_sessions', JSON.stringify(next));
+            safeSetItem('kw_sessions', JSON.stringify(next));
             return next;
           });
         } else if (payload.eventType === 'UPDATE') {
@@ -198,13 +220,13 @@ function App() {
           };
           setActiveSessions(prev => {
             const next = prev.some(x => x.id === s.id) ? prev.map(x => x.id === s.id ? s : x) : [...prev, s];
-            localStorage.setItem('kw_sessions', JSON.stringify(next));
+            safeSetItem('kw_sessions', JSON.stringify(next));
             return next;
           });
         } else if (payload.eventType === 'DELETE') {
           setActiveSessions(prev => {
             const next = prev.filter(x => x.id !== payload.old.id);
-            localStorage.setItem('kw_sessions', JSON.stringify(next));
+            safeSetItem('kw_sessions', JSON.stringify(next));
             return next;
           });
         }
@@ -234,7 +256,7 @@ function App() {
           setTransactions(prev => {
             if (prev.some(x => x.id === t.id)) return prev;
             const next = [...prev, t].sort((a, b) => (a.no || 0) - (b.no || 0));
-            localStorage.setItem('kw_txns', JSON.stringify(next));
+            safeSetItem('kw_txns', JSON.stringify(next));
             return next;
           });
         } else if (payload.eventType === 'UPDATE') {
@@ -261,13 +283,13 @@ function App() {
           setTransactions(prev => {
             const next = prev.some(x => x.id === t.id) ? prev.map(x => x.id === t.id ? t : x) : [...prev, t];
             const sorted = next.sort((a, b) => (a.no || 0) - (b.no || 0));
-            localStorage.setItem('kw_txns', JSON.stringify(sorted));
+            safeSetItem('kw_txns', JSON.stringify(sorted));
             return sorted;
           });
         } else if (payload.eventType === 'DELETE') {
           setTransactions(prev => {
             const next = prev.filter(x => x.id !== payload.old.id);
-            localStorage.setItem('kw_txns', JSON.stringify(next));
+            safeSetItem('kw_txns', JSON.stringify(next));
             return next;
           });
         }
@@ -311,7 +333,7 @@ function App() {
           shift: row.shift || '-'
         }));
         setTransactions(mergedTxns);
-        localStorage.setItem('kw_txns', JSON.stringify(mergedTxns));
+        safeSetItem('kw_txns', JSON.stringify(mergedTxns));
       }
 
       // Pull active sessions
@@ -327,7 +349,7 @@ function App() {
           payAwal: row.pay_awal || 'cash'
         }));
         setActiveSessions(mergedSessions);
-        localStorage.setItem('kw_sessions', JSON.stringify(mergedSessions));
+        safeSetItem('kw_sessions', JSON.stringify(mergedSessions));
       }
 
       // Pull settings
@@ -587,7 +609,7 @@ function App() {
 
     const updated = [...activeSessions, session];
     setActiveSessions(updated);
-    localStorage.setItem('kw_sessions', JSON.stringify(updated));
+    safeSetItem('kw_sessions', JSON.stringify(updated));
 
     if (printMulai) {
       handlePrintMulai(session);
@@ -635,7 +657,7 @@ function App() {
         const id = pendingAction.id;
         const updated = transactions.filter(t => t.id !== id);
         setTransactions(updated);
-        localStorage.setItem('kw_txns', JSON.stringify(updated));
+        safeSetItem('kw_txns', JSON.stringify(updated));
         
         if (sbConnected) {
           sb.from('transactions').delete().eq('id', id).then(() => {
@@ -650,7 +672,7 @@ function App() {
   const handleSaveEditedSession = (updatedSession) => {
     const updatedSessions = activeSessions.map(s => s.id === updatedSession.id ? updatedSession : s);
     setActiveSessions(updatedSessions);
-    localStorage.setItem('kw_sessions', JSON.stringify(updatedSessions));
+    safeSetItem('kw_sessions', JSON.stringify(updatedSessions));
 
     if (sbConnected) {
       sb.from('active_sessions')
@@ -709,11 +731,11 @@ function App() {
 
     const newTxns = [...transactions, txn];
     setTransactions(newTxns);
-    localStorage.setItem('kw_txns', JSON.stringify(newTxns));
+    safeSetItem('kw_txns', JSON.stringify(newTxns));
 
     const newSessions = activeSessions.filter(s => s.id !== session.id);
     setActiveSessions(newSessions);
-    localStorage.setItem('kw_sessions', JSON.stringify(newSessions));
+    safeSetItem('kw_sessions', JSON.stringify(newSessions));
 
     if (printSelesai) {
       handlePrintSelesai(txn);
