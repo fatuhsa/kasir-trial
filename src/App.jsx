@@ -704,6 +704,7 @@ function App() {
         sb.from('transactions').insert({
           id: txn.id,
           no: txn.no,
+          queue_no: txn.queueNo || 0,
           nama: txn.nama,
           tanggal: txn.tanggal,
           start_time: txn.startTime,
@@ -720,7 +721,10 @@ function App() {
           cash: txn.cash,
           qris: txn.qris,
           shift: txn.shift
-        }).then(() => console.log('Transaction logged to Supabase'));
+        }).then(({ error }) => {
+          if (error) console.error('Supabase insert txn error:', error);
+          else console.log('Transaction logged to Supabase');
+        });
       });
     }
 
