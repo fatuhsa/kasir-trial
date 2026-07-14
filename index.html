@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EVREN HOUSE</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- LOGIN PAGE -->
+<div id="loginPage">
+  <div class="login-card">
+    <div style="margin-bottom:24px">
+      <div class="login-brand">EVREN HOUSE</div>
+      <div class="login-sub">Scooter &amp; Stroller</div>
+    </div>
+    <hr class="login-divider" style="margin-top:0;margin-bottom:20px">
+    <div class="login-shift-title"><i class="bi bi-person-badge-fill me-1"></i>Login Shift Kasir</div>
+    <select id="loginUsername" class="login-select">
+      <option value="">— Pilih Nama Kasir —</option>
+      <option value="akbar">Akbar</option>
+      <option value="rani">Rani</option>
+      <option value="monica">Monica</option>
+      <option value="aldy">Aldy</option>
+      <option value="wahyu">Wahyu</option>
+      <option value="donny">Donny</option>
+      <option value="zumi">Zumi</option>
+      <option value="awang">Awang</option>
+    </select>
+    <input type="password" id="loginPassword" class="login-field" placeholder="Password shift..." onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn-login" onclick="doLogin()">
+      <i class="bi bi-box-arrow-in-right"></i>Mulai Shift
+    </button>
+    <div class="login-err" id="loginErr"></div>
+    <div style="margin-top:18px;font-size:.72rem;color:var(--text2);text-align:center">
+      <i class="bi bi-shield-lock me-1"></i>Akses terbatas untuk kasir Evren House
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TRACKING PAGE (public - scan QR) ═══ -->
+<div id="trackingPage">
+  <div class="track-header">
+    <div>
+      <div class="track-brand">EVREN HOUSE</div>
+      <div style="font-size:.65rem;color:var(--yellow);letter-spacing:1px;font-weight:700">Scooter &amp; Stroller</div>
+    </div>
+    <div id="trackStatusBadge"></div>
+  </div>
+  <div class="track-body" id="trackBody">
+    <div style="text-align:center;padding:40px;color:var(--text2)">
+      <i class="bi bi-hourglass-split" style="font-size:2rem"></i>
+      <p>Memuat data sewa...</p>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="mainApp" style="display:none">
+<header class="app-header sticky-top">
+  <div class="container-fluid px-3 px-md-4">
+    <div class="d-flex align-items-center justify-content-between py-2 gap-2">
+      <div>
+        <div class="brand-title">EVREN HOUSE</div>
+        <div class="brand-sub">Scooter &amp; Stroller</div>
+      </div>
+      <div class="d-flex align-items-center gap-2 gap-md-3">
+        <div class="shift-indicator d-flex" id="shiftIndicator" onclick="confirmLogout()">
+          <span class="shift-dot"></span>
+          <span id="shiftUserLabel">—</span>
+          <i class="bi bi-box-arrow-right ms-1" style="font-size:.75rem;opacity:.6"></i>
+        </div>
+        <div class="text-end">
+          <div class="clock-time" id="liveClock">00:00:00</div>
+          <div class="clock-date d-none d-sm-block" id="liveDate">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="container-fluid px-2 px-md-3 py-3" style="padding-bottom:80px">
+
+  <!-- DASHBOARD -->
+  <div id="tab-dashboard" class="tab-pane active">
+    <div class="row g-3">
+      <div class="col-12 col-lg-5 d-flex flex-column">
+        <div class="panel flex-fill">
+          <div class="panel-head"><i class="bi bi-plus-circle-fill clr-yellow"></i><span>Sewa Baru</span></div>
+          <div class="panel-body">
+            <label class="field-label">Nama Penyewa</label>
+            <div class="input-ico-wrap mb-3">
+              <i class="bi bi-person-fill ico"></i>
+              <input type="text" id="inputNama" class="cfield" placeholder="Masukkan nama penyewa...">
+            </div>
+            <label class="field-label mb-2">Metode Bayar Awal (Tarif Pokok)</label>
+            <div class="pay-awal-selector mb-3">
+              <label class="pay-awal-opt">
+                <input type="radio" name="payAwal" id="payAwalCash" value="cash" checked>
+                <span><i class="bi bi-cash-stack me-1"></i>Cash</span>
+              </label>
+              <label class="pay-awal-opt">
+                <input type="radio" name="payAwal" id="payAwalQris" value="qris">
+                <span><i class="bi bi-qr-code-scan me-1"></i>QRIS</span>
+              </label>
+            </div>
+            <label class="field-label mb-2">Pilih Item &amp; Jumlah</label>
+            <div class="row row-cols-2 row-cols-sm-3 g-2 mb-3" id="itemsGrid"></div>
+            <button class="btn-start w-100" onclick="mulaiSewa()">
+              <i class="bi bi-play-circle-fill me-2"></i>Mulai Sewa Sekarang
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-7 d-flex flex-column">
+        <div class="panel flex-fill">
+          <div class="panel-head">
+            <i class="bi bi-people-fill clr-cyan"></i><span>Penyewa Aktif</span>
+            <span class="ms-auto aktif-count" id="aktifCount">0</span>
+          </div>
+          <div class="panel-body">
+            <div class="input-ico-wrap mb-3">
+              <i class="bi bi-search ico"></i>
+              <input type="text" id="searchAktif" class="cfield" placeholder="Cari nama penyewa..." oninput="filterAktif()">
+            </div>
+            <div id="listAktif" class="aktif-scroll">
+              <div class="empty-box"><i class="bi bi-hourglass-split"></i><p>Belum ada penyewa aktif</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIWAYAT -->
+  <div id="tab-riwayat" class="tab-pane">
+    <div class="panel">
+      <div class="panel-head flex-wrap gap-2">
+        <i class="bi bi-clock-history clr-green"></i><span>Riwayat Transaksi</span>
+        <div class="ms-auto d-flex gap-2 flex-wrap align-items-center">
+          <input type="date" id="filterTanggal" class="cfield-sm" onchange="renderRiwayat()">
+          <button class="btn-export" onclick="showExportModal()"><i class="bi bi-download me-1"></i>Export</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="row g-2 mb-3" id="summaryCards"></div>
+        <div class="table-responsive">
+          <table class="ctable">
+            <thead>
+              <tr>
+                <th>No</th><th>Nama</th><th>Shift</th><th>Tgl</th><th>Waktu</th>
+                <th>Item</th><th>Tambahan</th><th>Dur OT</th>
+                <th class="th-pokok-cash"><i class="bi bi-cash-stack me-1"></i>Pokok (C)</th>
+                <th class="th-pokok-qris"><i class="bi bi-qr-code-scan me-1"></i>Pokok (NC)</th>
+                <th style="color:var(--green)">Tambahan (C)</th>
+                <th style="color:var(--cyan)">Tambahan (NC)</th>
+                <th style="color:var(--green)">Total Cash</th>
+                <th style="color:var(--cyan)">Total Non-Cash</th>
+                <th>Grand Total</th><th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="riwayatBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PENGATURAN -->
+  <div id="tab-pengaturan" class="tab-pane">
+    <div class="row g-3">
+      <div class="col-12">
+        <div class="panel">
+          <div class="panel-head">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="flex-shrink:0">
+              <path d="M3.89 15.672L6.255.461A.542.542 0 017.27.288l2.543 4.771 2.39-4.52a.542.542 0 01.96 0L22.073 22H3.89z" fill="#FFA000"/>
+              <path d="M17.656 18.281L13.84 3.326a.545.545 0 00-1.05-.021L9.274 10.52 17.656 18.281z" fill="#F57F17"/>
+              <path d="M3.89 15.672l.924-8.684 4.46 12.992zM22.073 22l-4.417-3.719L13.83 22z" fill="#FFCA28"/>
+            </svg>
+            <span>Koneksi Supabase</span>
+            <span class="ms-auto" id="fbStatusBadge">
+              <span class="fb-badge fb-badge-connecting"><span class="fb-status-dot fb-dot-connecting"></span>Menghubungkan…</span>
+            </span>
+          </div>
+          <div class="panel-body">
+            <div id="fbConnectingCard" class="fb-connecting-card">
+              <div class="fc-spin">⚡</div>
+              <div>
+                <div style="font-weight:800;color:var(--yellow)">Menghubungkan ke Supabase…</div>
+                <div style="font-size:.78rem;color:var(--text2);margin-top:3px">Menyambungkan ke database...</div>
+              </div>
+            </div>
+            <div id="fbConnectedInfo" class="d-none">
+              <div class="fb-auto-card">
+                <div class="fa-title"><i class="bi bi-lightning-charge-fill"></i>Terhubung ke Supabase</div>
+                <div class="fa-desc">Data sesi aktif, transaksi, dan QR tracking tersimpan di cloud. QR yang di-scan penyewa akan load data langsung dari Supabase secara real-time.</div>
+                <div class="d-flex gap-2 flex-wrap">
+                  <button class="btn-fb-connect" style="padding:9px 16px;font-size:.85rem" onclick="syncAllFromSupabase()"><i class="bi bi-arrow-down-circle-fill"></i> Tarik Data</button>
+                  <button class="btn-fb-connect" style="padding:9px 16px;font-size:.85rem;background:linear-gradient(135deg,#58a6ff,#1f6feb)" onclick="pushAllToSupabase()"><i class="bi bi-arrow-up-circle-fill"></i> Dorong ke Cloud</button>
+                </div>
+                <div class="mt-2" style="font-size:.72rem;color:var(--text2)">Terakhir sinkron: <span id="fbLastSyncText">—</span></div>
+              </div>
+              <div class="row g-2" id="fbCollectionStatus"></div>
+            </div>
+            <div id="fbFailedCard" class="d-none">
+              <div style="background:rgba(248,81,73,.08);border:1.5px solid rgba(248,81,73,.3);border-radius:12px;padding:16px 18px">
+                <div style="font-weight:800;color:var(--red);margin-bottom:6px"><i class="bi bi-exclamation-triangle-fill me-2"></i>Gagal Terhubung</div>
+                <div style="font-size:.82rem;color:var(--text2);margin-bottom:14px" id="fbFailedMsg">Periksa koneksi internet.</div>
+                <button class="btn-fb-connect" onclick="autoConnectSupabase()"><i class="bi bi-arrow-repeat me-1"></i> Coba Lagi</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-xl-7">
+        <div class="panel h-100">
+          <div class="panel-head"><i class="bi bi-image-fill clr-yellow"></i><span>Gambar Item</span></div>
+          <div class="panel-body">
+            <div class="row row-cols-2 row-cols-sm-3 g-2" id="settingItemsGrid"></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-xl-5">
+        <div class="row g-3">
+          <div class="col-12">
+            <div class="panel">
+              <div class="panel-head"><i class="bi bi-palette-fill clr-yellow"></i><span>Tampilan</span></div>
+              <div class="panel-body">
+                <div class="toggle-row">
+                  <div>
+                    <div style="font-weight:700">Mode Tampilan</div>
+                    <div class="small" style="color:var(--text2)" id="themeDesc">Mode Gelap aktif</div>
+                  </div>
+                  <div class="theme-seg">
+                    <button class="theme-seg-btn" id="themeBtnLight" onclick="setTheme('light')"><i class="bi bi-sun-fill"></i><span>Light</span></button>
+                    <button class="theme-seg-btn active" id="themeBtnDark" onclick="setTheme('dark')"><i class="bi bi-moon-stars-fill"></i><span>Dark</span></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="panel">
+              <div class="panel-head"><i class="bi bi-printer-fill clr-cyan"></i><span>Auto Print Struk</span></div>
+              <div class="panel-body">
+                <div class="toggle-row">
+                  <div><span>Print saat <b>mulai sewa</b></span></div>
+                  <div class="form-check form-switch mb-0"><input class="form-check-input ctoggle" type="checkbox" id="autoPrintMulai" onchange="savePrintSettings()"></div>
+                </div>
+                <div class="toggle-row">
+                  <div><span>Print saat <b>selesai bayar</b></span></div>
+                  <div class="form-check form-switch mb-0"><input class="form-check-input ctoggle" type="checkbox" id="autoPrintSelesai" onchange="savePrintSettings()"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="panel">
+              <div class="panel-head"><i class="bi bi-shield-lock-fill clr-red"></i><span>Password Admin</span></div>
+              <div class="panel-body">
+                <p class="text-secondary small mb-2">Default: <code>admin</code></p>
+                <div class="input-group">
+                  <input type="password" id="adminPassInput" class="cfield flex-fill" placeholder="Password baru...">
+                  <button class="btn-sec ms-2" onclick="changePassword()">Ubah</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 mt-1">
+            <div style="border-top:1px solid var(--border);padding:12px 2px 0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px">
+              <span style="font-size:.72rem;color:var(--text2)"><i class="bi bi-code-slash me-1"></i><span id="appVersionLabel"></span></span>
+              <span style="font-size:.72rem;color:var(--text2)"><i class="bi bi-clock-history me-1"></i>Last deploy: <span id="deployDateLabel"></span></span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<nav class="footer-nav">
+  <button class="fnav-btn active" id="fnav-dashboard" onclick="switchTab('dashboard')">
+    <div class="fnav-ico-wrap"><i class="bi bi-grid-1x2-fill"></i><span class="fnav-badge d-none" id="badgeAktif">0</span></div>
+    <span class="fnav-label">Sewa &amp; Aktif</span>
+  </button>
+  <button class="fnav-btn" id="fnav-riwayat" onclick="switchTab('riwayat')">
+    <div class="fnav-ico-wrap"><i class="bi bi-clock-history"></i></div>
+    <span class="fnav-label">Riwayat</span>
+  </button>
+  <button class="fnav-btn" id="fnav-pengaturan" onclick="switchTab('pengaturan')">
+    <div class="fnav-ico-wrap"><i class="bi bi-gear-fill"></i></div>
+    <span class="fnav-label">Pengaturan</span>
+  </button>
+</nav>
+</div>
+
+<!-- MODALS -->
+<div class="modal fade" id="modalHitung" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
+    <div class="modal-content cmodal">
+      <div class="modal-header cmodal-head">
+        <h5 class="modal-title"><i class="bi bi-calculator-fill me-2 clr-yellow"></i>Hitung Sewa</h5>
+        <button type="button" class="btn-close" onclick="closeModal('modalHitung')"></button>
+      </div>
+      <div class="modal-body p-0" id="modalHitungContent"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalBayar" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content cmodal">
+      <div class="modal-header cmodal-head">
+        <h5 class="modal-title"><i class="bi bi-credit-card-fill me-2 clr-green"></i>Pembayaran</h5>
+        <button type="button" class="btn-close" onclick="closeModal('modalBayar')"></button>
+      </div>
+      <div class="modal-body p-0" id="modalBayarContent"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalExport" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content cmodal">
+      <div class="modal-header cmodal-head">
+        <h5 class="modal-title"><i class="bi bi-download me-2 clr-cyan"></i>Export Transaksi</h5>
+        <button type="button" class="btn-close" onclick="closeModal('modalExport')"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-secondary mb-2">Pilih periode:</p>
+        <div class="d-flex gap-2 mb-3">
+          <button class="btn-outline-c flex-fill" id="expBtnHarian" onclick="exportData('harian')">📅 Harian</button>
+          <button class="btn-outline-c flex-fill" id="expBtnBulanan" onclick="exportData('bulanan')">📆 Bulanan</button>
+          <button class="btn-outline-c flex-fill" id="expBtnTahunan" onclick="exportData('tahunan')">🗓️ Tahunan</button>
+        </div>
+        <div id="exportDateInputs" class="mb-3"></div>
+        <button class="btn-start w-100 mb-2" onclick="doExport()"><i class="bi bi-file-earmark-excel-fill me-2"></i>Export Excel</button>
+        <button class="btn-sec w-100" onclick="closeModal('modalExport')">Batal</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalEdit" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content cmodal">
+      <div class="modal-header cmodal-head">
+        <h5 class="modal-title"><i class="bi bi-pencil-square me-2 clr-yellow"></i>Edit Transaksi</h5>
+        <button type="button" class="btn-close" onclick="closeModal('modalEdit')"></button>
+      </div>
+      <div class="modal-body p-0" id="modalEditContent"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalEditSesi" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content cmodal">
+      <div class="modal-header cmodal-head">
+        <h5 class="modal-title"><i class="bi bi-pencil-fill me-2 clr-yellow"></i>Edit Sesi Aktif</h5>
+        <button type="button" class="btn-close" onclick="closeModal('modalEditSesi')"></button>
+      </div>
+      <div class="modal-body p-0" id="modalEditSesiContent"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalPassword" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-sm modal-dialog modal-dialog-centered">
+    <div class="modal-content cmodal">
+      <div class="modal-header cmodal-head">
+        <h5 class="modal-title" id="passModalTitle"><i class="bi bi-shield-lock-fill me-2"></i>Verifikasi Admin</h5>
+        <button type="button" class="btn-close" onclick="closeModal('modalPassword')"></button>
+      </div>
+      <div class="modal-body" id="passModalBody">
+        <input type="password" id="passInput" class="cfield w-100 mb-2" placeholder="Masukkan password..." style="padding-left:12px">
+        <button class="btn-start w-100" onclick="verifyPassword()">Masuk</button>
+        <p id="passError" class="text-danger small mt-2 d-none">❌ Password salah!</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- QR Modal -->
+<div class="modal fade" id="modalQR" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content cmodal">
+      <div class="modal-header cmodal-head">
+        <h5 class="modal-title"><i class="bi bi-qr-code-scan me-2 clr-cyan"></i>QR Tracking Sewa</h5>
+        <button type="button" class="btn-close" onclick="closeModal('modalQR')"></button>
+      </div>
+      <div class="modal-body p-0" id="modalQRContent"></div>
+    </div>
+  </div>
+</div>
+
+<div id="printArea" style="display:none"></div>
+<div class="fb-toast" id="fbToast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+const closeModal = id => { const m = bootstrap.Modal.getInstance(document.getElementById(id)); if(m) m.hide(); };
+</script>
+<script src="script.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js')
+        .then(reg => console.log('Service Worker registered', reg))
+        .catch(err => console.log('Service Worker registration failed', err));
+    });
+  }
+</script>
+</body>
+</html>
