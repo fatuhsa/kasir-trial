@@ -666,14 +666,25 @@ function App() {
     alert('Sesi diperbarui!');
   };
 
-  const handleFinalizePayment = (cash, qris) => {
+  const handleFinalizePayment = async (cash, qris) => {
     if (!activePaymentData) return;
     const { session, itemsCalc, base, ot, tol, grand, otStr, otDurStr, elapsed, endTime } = activePaymentData;
     const itemStr = session.items.map(i => `${i.code}×${i.qty}`).join(', ');
-    
+
+    // Get collision-proof txn number from DB sequence, fallback to local count if offline
+    let txnNo = transactions.length + 1;
+    if (sbConnected) {
+      try {
+        const { data, error } = await sb.rpc('next_txn_no');
+        if (!error && data) txnNo = data;
+      } catch (e) {
+        console.warn('next_txn_no RPC failed, using local count:', e);
+      }
+    }
+
     const txn = {
       id: session.id,
-      no: transactions.length + 1,
+      no: txnNo,
       queueNo: session.queueNo || 0,
       nama: session.nama,
       tanggal: todayStr(),
@@ -729,7 +740,7 @@ function App() {
           shift: txn.shift
         }).then(({ error }) => {
           if (error) console.error('Supabase insert txn error:', error);
-          else console.log('Transaction logged to Supabase');
+          else console.log('Transaction logged to Supabase, no:', txn.no);
         });
       });
     }
