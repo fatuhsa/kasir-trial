@@ -29,7 +29,7 @@ function HistoryTab({ transactions, onDeleteTxn }) {
   const totalPokok = filtered.reduce((s, t) => s + (t.totalBase || 0), 0);
   const totalPokokCash = filtered.reduce((s, t) => s + ((t.payAwal || 'cash') === 'cash' ? (t.totalBase || 0) : 0), 0);
   const totalPokokQris = filtered.reduce((s, t) => s + ((t.payAwal || 'cash') === 'qris' ? (t.totalBase || 0) : 0), 0);
-  const totalTambahan = filtered.reduce((s, t) => s + (t.totalOT || 0), 0);
+  const totalTambahan = filtered.reduce((s, t) => s + (t.grandTotal || 0), 0);
   const totalOTCash = filtered.reduce((s, t) => s + (t.cash || 0), 0);
   const totalOTQris = filtered.reduce((s, t) => s + (t.qris || 0), 0);
 

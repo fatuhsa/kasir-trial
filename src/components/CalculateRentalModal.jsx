@@ -2,19 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { ITEMS, fmtRp, fmtDur } from '../App';
 
 function CalculateRentalModal({ session, onClose, onProceedPayment }) {
-  const elapsed = Math.floor((Date.now() - session.startTime) / 1000);
-  const elapsedMin = elapsed / 60;
-
+  const [elapsed, setElapsed] = useState(0);
+  const [elapsedMin, setElapsedMin] = useState(0);
   const [itemsCalc, setItemsCalc] = useState([]);
   const [manualAdj, setManualAdj] = useState(0);
 
   useEffect(() => {
+    const el = Math.floor((Date.now() - session.startTime) / 1000);
+    const elMin = el / 60;
+    setElapsed(el);
+    setElapsedMin(elMin);
+
     const initial = session.items.map(it => {
       const def = ITEMS.find(item => item.code === it.code);
       const limitMin = def && def.isPackage ? def.packageHours * 60 : 60;
       
       let otFull = 0, otHalf = 0;
-      const actualOver = elapsedMin - limitMin;
+      const actualOver = elMin - limitMin;
       if (Math.floor(actualOver) >= 11) {
         const cycles = Math.floor(actualOver / 60);
         const remainder = actualOver % 60;
@@ -40,7 +44,7 @@ function CalculateRentalModal({ session, onClose, onProceedPayment }) {
       };
     });
     setItemsCalc(initial);
-  }, [session, elapsedMin]);
+  }, [session]);
 
   const handleTolToggle = (idx, checked) => {
     setItemsCalc(prev => prev.map((it, i) => {

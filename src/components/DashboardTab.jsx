@@ -148,7 +148,7 @@ function DashboardTab({ activeSessions, onStartSewa, getImgUrl, onSelesaiSewa, o
                       const d = ITEMS.find(item => item.code === it.code);
                       return d && d.isPackage;
                     });
-                    const pkgHours = pkgItem ? ITEMS.find(item => item.code === pkgItem.code).packageHours : 1;
+                    const pkgHours = pkgItem ? (ITEMS.find(item => item.code === pkgItem.code)?.packageHours || 1) : 1;
                     const limitMin = pkgItem ? pkgHours * 60 : 60;
                     const overMin = (elapsedSec / 60) - limitMin;
                     
