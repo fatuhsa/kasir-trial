@@ -696,7 +696,25 @@ function App() {
     const { session, itemsCalc, base, ot, tol, grand, otStr, otDurStr, elapsed, endTime } = activePaymentData;
     const itemStr = session.items.map(i => `${i.code}×${i.qty}`).join(', ');
 
-    // Get collision-proof txn number from DB sequence, fallback to local count if offline
+    // ── Atomic claim: prevent double-checkout race condition ──────────────
+    // When online, atomically delete session in DB. If another terminal
+    // already deleted it (returned false), abort and show error.
+    if (sbConnected) {
+      try {
+        const { data: claimed, error: claimErr } = await sb.rpc('claim_and_delete_session', { p_id: session.id });
+        if (claimErr) throw claimErr;
+        if (!claimed) {
+          alert('⚠️ Sesi ini sudah diselesaikan oleh terminal lain.\nPembayaran dibatalkan.');
+          setActivePaymentData(null);
+          return;
+        }
+      } catch (e) {
+        console.warn('claim_and_delete_session failed, proceeding offline:', e);
+        // Network error → fall through to local-only mode
+      }
+    }
+
+    // ── Get collision-proof txn number from DB sequence ───────────────────
     let txnNo = transactions.length + 1;
     if (sbConnected) {
       try {
@@ -729,6 +747,7 @@ function App() {
       shift: currentShiftUser || '-'
     };
 
+    // Update local state
     const newTxns = [...transactions, txn];
     setTransactions(newTxns);
     safeSetItem('kw_txns', JSON.stringify(newTxns));
@@ -742,32 +761,34 @@ function App() {
     }
 
     if (sbConnected) {
-      sb.from('active_sessions').delete().eq('id', session.id).then(() => {
-        sb.from('transactions').insert({
-          id: txn.id,
-          no: txn.no,
-          queue_no: txn.queueNo || 0,
-          nama: txn.nama,
-          tanggal: txn.tanggal,
-          start_time: txn.startTime,
-          end_time: txn.endTime,
-          items: txn.items,
-          ot: txn.ot,
-          ot_dur: txn.otDur,
-          total_base: txn.totalBase,
-          total_ot: txn.totalOT,
-          total_tol: txn.totalTol,
-          grand_total: txn.grandTotal,
-          total_all: txn.totalAll,
-          pay_awal: txn.payAwal,
-          cash: txn.cash,
-          qris: txn.qris,
-          shift: txn.shift
-        }).then(({ error }) => {
-          if (error) console.error('Supabase insert txn error:', error);
-          else console.log('Transaction logged to Supabase, no:', txn.no);
-        });
+      // Session already deleted by claim_and_delete_session above — only insert txn
+      sb.from('transactions').insert({
+        id: txn.id,
+        no: txn.no,
+        queue_no: txn.queueNo || 0,
+        nama: txn.nama,
+        tanggal: txn.tanggal,
+        start_time: txn.startTime,
+        end_time: txn.endTime,
+        items: txn.items,
+        ot: txn.ot,
+        ot_dur: txn.otDur,
+        total_base: txn.totalBase,
+        total_ot: txn.totalOT,
+        total_tol: txn.totalTol,
+        grand_total: txn.grandTotal,
+        total_all: txn.totalAll,
+        pay_awal: txn.payAwal,
+        cash: txn.cash,
+        qris: txn.qris,
+        shift: txn.shift
+      }).then(({ error }) => {
+        if (error) console.error('Supabase insert txn error:', error);
+        else console.log('Transaction logged to Supabase, no:', txn.no);
       });
+    } else {
+      // Offline: also delete session locally (already done above) — no DB action
+      console.warn('Offline: transaction saved to localStorage only');
     }
 
     setActivePaymentData(null);
