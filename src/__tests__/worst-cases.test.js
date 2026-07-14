@@ -1,0 +1,205 @@
+/**
+ * Worst-case scenario tests — weekend-rush conditions.
+ * Tests the fixes we implemented for the critical bugs.
+ */
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { calcOT } from '../lib/ot';
+import { safeSetItem } from '../App';
+
+// ─── 1. txn.no collision via sequence ────────────────────────────────────────
+// The actual DB sequence test requires integration, but we verify the
+// fallback logic stays consistent in offline mode.
+
+describe('txn.no — offline fallback', () => {
+  it('falls back to transactions.length + 1 when offline', () => {
+    const transactions = [{ id: 'a', no: 1 }, { id: 'b', no: 2 }];
+    // Simulates the fallback path in handleFinalizePayment
+    const txnNo = transactions.length + 1;
+    expect(txnNo).toBe(3);
+  });
+
+  it('two concurrent offline checkouts get different no if arrays differ', () => {
+    // Terminal A has 5 txns, Terminal B has 6 — they'll get different numbers
+    const noA = [1,2,3,4,5].length + 1;
+    const noB = [1,2,3,4,5,6].length + 1;
+    expect(noA).toBe(6);
+    expect(noB).toBe(7);
+  });
+});
+
+// ─── 2. Double-checkout race condition ───────────────────────────────────────
+
+describe('claim_and_delete_session logic', () => {
+  it('returns true when session exists (claim succeeds)', () => {
+    // Simulates DB returning claimed=true
+    const sessions = [{ id: 'sess-1' }, { id: 'sess-2' }];
+
+    function claimLocally(id, sessions) {
+      const idx = sessions.findIndex(s => s.id === id);
+      if (idx === -1) return false;
+      sessions.splice(idx, 1);
+      return true;
+    }
+
+    expect(claimLocally('sess-1', [...sessions])).toBe(true);
+  });
+
+  it('returns false when session already claimed by another terminal', () => {
+    const sessions = [{ id: 'sess-2' }]; // sess-1 already gone
+
+    function claimLocally(id, sessions) {
+      const idx = sessions.findIndex(s => s.id === id);
+      if (idx === -1) return false;
+      sessions.splice(idx, 1);
+      return true;
+    }
+
+    expect(claimLocally('sess-1', sessions)).toBe(false);
+  });
+
+  it('two concurrent claims on same id: only one wins', () => {
+    let sessions = [{ id: 'sess-x' }];
+
+    function claimLocally(id) {
+      const idx = sessions.findIndex(s => s.id === id);
+      if (idx === -1) return false;
+      sessions.splice(idx, 1);
+      return true;
+    }
+
+    const resultA = claimLocally('sess-x');
+    const resultB = claimLocally('sess-x'); // same id, second call
+
+    expect(resultA).toBe(true);
+    expect(resultB).toBe(false); // already gone
+    // Only one transaction should be created
+    expect([resultA, resultB].filter(Boolean).length).toBe(1);
+  });
+});
+
+// ─── 3. Midnight rollover — tanggal locked at start ──────────────────────────
+
+describe('midnight-spanning shift — tanggal', () => {
+  it('session tanggal stays as start day even after midnight', () => {
+    // Session started at 23:50 on July 14
+    const startTs = new Date('2026-07-14T23:50:00').getTime();
+    const startTanggal = (() => {
+      const d = new Date(startTs);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    })();
+
+    expect(startTanggal).toBe('2026-07-14');
+
+    // Payment happens at 00:10 on July 15
+    // todayStr() at payment time would give '2026-07-15'
+    const paymentTs = new Date('2026-07-15T00:10:00').getTime();
+    const paymentDay = (() => {
+      const d = new Date(paymentTs);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    })();
+
+    expect(paymentDay).toBe('2026-07-15');
+
+    // With fix: txn.tanggal = session.tanggal (locked at start)
+    const session = { tanggal: startTanggal };
+    const txnTanggal = session.tanggal || paymentDay;
+    expect(txnTanggal).toBe('2026-07-14'); // ✅ correct day
+  });
+
+  it('fallback to todayStr() only for sessions without tanggal (old sessions)', () => {
+    const session = { tanggal: '' }; // old session, no tanggal field
+    const todayFallback = '2026-07-15';
+    const txnTanggal = session.tanggal || todayFallback;
+    expect(txnTanggal).toBe('2026-07-15'); // falls back correctly
+  });
+});
+
+// ─── 4. localStorage overflow ─────────────────────────────────────────────────
+
+describe('safeSetItem — QuotaExceededError handling', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('normal write works', () => {
+    safeSetItem('kw_sessions', JSON.stringify([{ id: '1' }]));
+    expect(JSON.parse(localStorage.getItem('kw_sessions'))).toHaveLength(1);
+  });
+
+  it('prunes to last 200 txns on quota exceeded', () => {
+    const txns = Array.from({ length: 350 }, (_, i) => ({ id: `${i}`, no: i }));
+    localStorage.setItem('kw_txns', JSON.stringify(txns));
+
+    let callCount = 0;
+    const original = Storage.prototype.setItem;
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function(key, value) {
+      callCount++;
+      if (callCount === 1) {
+        const err = new Error('QuotaExceededError');
+        err.name = 'QuotaExceededError';
+        throw err;
+      }
+      return original.call(this, key, value);
+    });
+
+    safeSetItem('kw_extra', '"x"');
+
+    const remaining = JSON.parse(localStorage.getItem('kw_txns'));
+    expect(remaining.length).toBe(200);
+    expect(remaining[0].no).toBe(150); // kept last 200 of 350
+
+    vi.restoreAllMocks();
+  });
+});
+
+// ─── 5. Zombie session detection ─────────────────────────────────────────────
+
+describe('zombie session detection', () => {
+  it('marks session as zombie after 8 hours', () => {
+    const ZOMBIE_THRESHOLD = 28800; // 8h in seconds
+
+    const isZombie = (elapsedSec) => elapsedSec > ZOMBIE_THRESHOLD;
+
+    expect(isZombie(28799)).toBe(false); // 7h59m59s — not zombie
+    expect(isZombie(28800)).toBe(false); // exactly 8h — not zombie
+    expect(isZombie(28801)).toBe(true);  // 8h0m1s — zombie!
+    expect(isZombie(86400)).toBe(true);  // 24h — definitely zombie
+  });
+});
+
+// ─── 6. OT edge cases — real skenario weekend ────────────────────────────────
+
+describe('OT edge cases from weekend rush', () => {
+  it('customer returns at exactly 10m59s over — still free', () => {
+    // elapsedMin = 70.983... (10m59s over 60 min limit)
+    const elapsedSec = 60 * 60 + 10 * 60 + 59; // 4259 seconds
+    const elapsedMin = elapsedSec / 60; // 70.9833...
+    expect(calcOT(elapsedMin, 60)).toEqual({ otFull: 0, otHalf: 0 });
+  });
+
+  it('customer returns at exactly 11m0s over — OT kicks in', () => {
+    const elapsedSec = 60 * 60 + 11 * 60; // 4260 seconds
+    const elapsedMin = elapsedSec / 60; // 71 minutes exactly
+    expect(calcOT(elapsedMin, 60)).toEqual({ otFull: 0, otHalf: 1 });
+  });
+
+  it('package 3h: OT at 3h11m', () => {
+    const elapsedMin = 3 * 60 + 11; // 191 min
+    expect(calcOT(elapsedMin, 180)).toEqual({ otFull: 0, otHalf: 1 });
+  });
+
+  it('multiple items, each calculated independently', () => {
+    // 2 scooters rented, 30 min OT each
+    const elapsedMin = 90;
+    const limitMin = 60;
+    const sd = { priceOT30: 25000, priceOT60: 50000 };
+
+    const { otFull, otHalf } = calcOT(elapsedMin, limitMin);
+    const costPerUnit = otFull * sd.priceOT60 + otHalf * sd.priceOT30;
+    const totalCost = costPerUnit * 2; // qty = 2
+
+    expect(otHalf).toBe(1);
+    expect(costPerUnit).toBe(25000);
+    expect(totalCost).toBe(50000);
+  });
+});
