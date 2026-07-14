@@ -11,6 +11,7 @@ import PaymentModal from './components/PaymentModal';
 import PasswordVerificationModal from './components/PasswordVerificationModal';
 import QRCodeModal from './components/QRCodeModal';
 import EditActiveSessionModal from './components/EditActiveSessionModal';
+import TrackingPage from './components/TrackingPage';
 
 export const ITEMS = [
   { code:'ST',  name:'Stroller',          emoji:'🛺', defaultImg:'https://i.ibb.co.com/fzwMy2XL/The-Edit-The-stroller-changing-the-game-banner-desktop.webp', priceHour:20000, priceOT30:10000, priceOT60:20000 },
@@ -637,14 +638,7 @@ function App() {
   };
 
   if (isTrackingMode) {
-    return (
-      <div id="trackingPage">
-        <div className="track-body" style={{ color: 'white', padding: '40px' }}>
-          <h2>Tracking Sesi: {trackingId}</h2>
-          <p>Fitur tracking akan dikembangkan pada task selanjutnya.</p>
-        </div>
-      </div>
-    );
+    return <TrackingPage trackingId={trackingId} />;
   }
 
   const getImgUrl = (code) => {
