@@ -172,7 +172,7 @@ function SettingsTab({
               <div className="panel">
                 <div className="panel-head"><i className="bi bi-shield-lock-fill clr-red"></i><span>Password Admin</span></div>
                 <div className="panel-body">
-                  <p className="text-secondary small mb-2">Current: <code>{adminPassword}</code></p>
+                  <p className="text-secondary small mb-2">Current: <code>{'*'.repeat(adminPassword?.length || 0)}</code></p>
                   <div className="input-group">
                     <input 
                       type="password" 
