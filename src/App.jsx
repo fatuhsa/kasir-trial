@@ -35,6 +35,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [theme, setTheme] = useState('dark');
   const [sbConnected, setSbConnected] = useState(false);
+  const [realtimeStatus, setRealtimeStatus] = useState('CONNECTING');
   const [isTrackingMode, setIsTrackingMode] = useState(false);
   const [trackingId, setTrackingId] = useState('');
   const [liveTime, setLiveTime] = useState('00:00:00');
@@ -271,7 +272,9 @@ function App() {
           });
         }
       })
-      .subscribe();
+      .subscribe((status) => {
+        setRealtimeStatus(status); // 'SUBSCRIBED' | 'CHANNEL_ERROR' | 'TIMED_OUT' | 'CLOSED'
+      });
 
     return () => {
       window.removeEventListener('hashchange', checkHash);
@@ -812,6 +815,30 @@ function App() {
                 <span className="shift-dot"></span>
                 <span>{currentShiftUser}</span>
                 <i className="bi bi-box-arrow-right ms-1" style={{ fontSize: '.75rem', opacity: .6 }}></i>
+              </div>
+              {/* Realtime status badge */}
+              <div title={`Realtime: ${realtimeStatus}`} style={{
+                display: 'flex', alignItems: 'center', gap: '4px',
+                fontSize: '.65rem', fontWeight: 700, letterSpacing: '.5px',
+                padding: '2px 7px', borderRadius: '99px', cursor: 'default',
+                background: realtimeStatus === 'SUBSCRIBED'
+                  ? 'rgba(63,185,80,.15)' : realtimeStatus === 'CONNECTING'
+                  ? 'rgba(227,179,65,.15)' : 'rgba(249,115,22,.15)',
+                color: realtimeStatus === 'SUBSCRIBED'
+                  ? 'var(--green)' : realtimeStatus === 'CONNECTING'
+                  ? 'var(--yellow)' : 'var(--orange)',
+                border: `1px solid ${realtimeStatus === 'SUBSCRIBED'
+                  ? 'rgba(63,185,80,.35)' : realtimeStatus === 'CONNECTING'
+                  ? 'rgba(227,179,65,.35)' : 'rgba(249,115,22,.35)'}`,
+              }}>
+                <span style={{
+                  width: 6, height: 6, borderRadius: '50%', display: 'inline-block',
+                  background: 'currentColor',
+                  animation: realtimeStatus === 'SUBSCRIBED' ? 'none' : 'pulse 1.2s infinite',
+                }}/>
+                <span className="d-none d-sm-inline">
+                  {realtimeStatus === 'SUBSCRIBED' ? 'LIVE' : realtimeStatus === 'CONNECTING' ? 'SYNC…' : 'OFFLINE'}
+                </span>
               </div>
               <div className="text-end">
                 <div className="clock-time">{liveTime}</div>
