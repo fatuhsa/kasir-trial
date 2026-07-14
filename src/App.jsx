@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import LoginPage from './components/LoginPage';
 import { sb } from './supabase';
+import DashboardTab from './components/DashboardTab';
 
 export const ITEMS = [
   { code:'ST',  name:'Stroller',          emoji:'🛺', defaultImg:'https://i.ibb.co.com/fzwMy2XL/The-Edit-The-stroller-changing-the-game-banner-desktop.webp', priceHour:20000, priceOT30:10000, priceOT60:20000 },
@@ -109,6 +110,36 @@ function App() {
     );
   }
 
+  const handleStartSewa = (nama, items, payAwal) => {
+    const newQueueNo = shiftQueueNo + 1;
+    setShiftQueueNo(newQueueNo);
+    localStorage.setItem('kw_shiftQNo', newQueueNo);
+
+    const session = {
+      id: Math.random().toString(36).substring(2, 11),
+      nama,
+      items,
+      startTime: Date.now(),
+      payAwal,
+      queueNo: newQueueNo
+    };
+
+    const updated = [...activeSessions, session];
+    setActiveSessions(updated);
+    localStorage.setItem('kw_sessions', JSON.stringify(updated));
+
+    // Supabase push logic (async)
+    sb.from('active_sessions').upsert({
+      id: session.id,
+      nama: session.nama,
+      items: session.items,
+      start_time: session.startTime,
+      pay_awal: session.payAwal
+    }).then(() => console.log('Sewa saved to Supabase'));
+  };
+
+  const getImgUrl = (code) => localStorage.getItem('kw_img_' + code);
+
   if (!currentShiftUser) {
     return <LoginPage onLogin={handleLogin} />;
   }
@@ -137,8 +168,47 @@ function App() {
         </div>
       </header>
       <div className="container-fluid px-2 px-md-3 py-3" style={{ paddingBottom: '80px' }}>
-        <h4>Active Tab: {activeTab}</h4>
+        {activeTab === 'dashboard' && (
+          <DashboardTab
+            activeSessions={activeSessions}
+            onStartSewa={handleStartSewa}
+            getImgUrl={getImgUrl}
+          />
+        )}
+        {activeTab !== 'dashboard' && <h4>Active Tab: {activeTab}</h4>}
       </div>
+
+      <nav className="footer-nav">
+        <button 
+          className={`fnav-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
+          id="fnav-dashboard" 
+          onClick={() => setActiveTab('dashboard')}
+        >
+          <div className="fnav-ico-wrap">
+            <i className="bi bi-grid-1x2-fill"></i>
+            {activeSessions.length > 0 && (
+              <span className="fnav-badge" id="badgeAktif">{activeSessions.length}</span>
+            )}
+          </div>
+          <span className="fnav-label">Sewa &amp; Aktif</span>
+        </button>
+        <button 
+          className={`fnav-btn ${activeTab === 'riwayat' ? 'active' : ''}`}
+          id="fnav-riwayat" 
+          onClick={() => setActiveTab('riwayat')}
+        >
+          <div className="fnav-ico-wrap"><i className="bi bi-clock-history"></i></div>
+          <span className="fnav-label">Riwayat</span>
+        </button>
+        <button 
+          className={`fnav-btn ${activeTab === 'pengaturan' ? 'active' : ''}`}
+          id="fnav-pengaturan" 
+          onClick={() => setActiveTab('pengaturan')}
+        >
+          <div className="fnav-ico-wrap"><i className="bi bi-gear-fill"></i></div>
+          <span className="fnav-label">Pengaturan</span>
+        </button>
+      </nav>
     </div>
   );
 }
