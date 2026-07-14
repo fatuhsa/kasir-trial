@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import LoginPage from './components/LoginPage';
 import { sb } from './supabase';
 
 export const ITEMS = [
@@ -24,6 +25,26 @@ function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [theme, setTheme] = useState('dark');
   const [sbConnected, setSbConnected] = useState(false);
+  const [isTrackingMode, setIsTrackingMode] = useState(false);
+  const [trackingId, setTrackingId] = useState('');
+  const [liveTime, setLiveTime] = useState('00:00:00');
+  const [liveDate, setLiveDate] = useState('—');
+
+  const handleLogin = (user) => {
+    // Find proper capitalization
+    const cName = user.charAt(0).toUpperCase() + user.slice(1);
+    setCurrentShiftUser(cName);
+    localStorage.setItem('kw_currentUser', cName);
+  };
+
+  const handleLogout = () => {
+    if (window.confirm(`Akhiri shift sebagai ${currentShiftUser}?`)) {
+      localStorage.removeItem('kw_currentUser');
+      localStorage.removeItem('kw_shiftQNo');
+      setShiftQueueNo(0);
+      setCurrentShiftUser(null);
+    }
+  };
 
   useEffect(() => {
     // Load initial localstorage
@@ -37,17 +58,87 @@ function App() {
     } catch(e) {}
     setAdminPassword(localStorage.getItem('kw_pass') || 'admin');
     setShiftQueueNo(parseInt(localStorage.getItem('kw_shiftQNo') || '0'));
-    setCurrentShiftUser(localStorage.getItem('kw_currentUser'));
-    
+
     const savedTheme = localStorage.getItem('kw_theme') || 'dark';
     setTheme(savedTheme);
     document.documentElement.setAttribute('data-theme', savedTheme);
+
+    // Check saved user
+    const savedUser = localStorage.getItem('kw_currentUser');
+    if (savedUser) setCurrentShiftUser(savedUser);
+
+    // Check hash route
+    const checkHash = () => {
+      const hash = window.location.hash;
+      if (hash.startsWith('#track/')) {
+        setIsTrackingMode(true);
+        setTrackingId(hash.replace('#track/', '').trim());
+      } else {
+        setIsTrackingMode(false);
+        setTrackingId('');
+      }
+    };
+    checkHash();
+    window.addEventListener('hashchange', checkHash);
+
+    // Start clock
+    const tick = () => {
+      const now = new Date();
+      setLiveTime(now.toTimeString().slice(0, 8));
+      const days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+      const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+      setLiveDate(`${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`);
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+
+    return () => {
+      window.removeEventListener('hashchange', checkHash);
+      clearInterval(interval);
+    };
   }, []);
 
+  if (isTrackingMode) {
+    return (
+      <div id="trackingPage">
+        <div className="track-body" style={{ color: 'white', padding: '40px' }}>
+          <h2>Tracking Sesi: {trackingId}</h2>
+          <p>Fitur tracking akan dikembangkan pada task selanjutnya.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentShiftUser) {
+    return <LoginPage onLogin={handleLogin} />;
+  }
+
   return (
-    <div className="container py-5">
-      <p>Current User: {currentShiftUser || 'Guest'}</p>
-      <p>Theme: {theme}</p>
+    <div id="mainApp">
+      <header className="app-header sticky-top">
+        <div className="container-fluid px-3 px-md-4">
+          <div className="d-flex align-items-center justify-content-between py-2 gap-2">
+            <div>
+              <div className="brand-title">EVREN HOUSE</div>
+              <div className="brand-sub">Scooter &amp; Stroller</div>
+            </div>
+            <div className="d-flex align-items-center gap-2 gap-md-3">
+              <div className="shift-indicator d-flex" onClick={handleLogout}>
+                <span className="shift-dot"></span>
+                <span>{currentShiftUser}</span>
+                <i className="bi bi-box-arrow-right ms-1" style={{ fontSize: '.75rem', opacity: .6 }}></i>
+              </div>
+              <div className="text-end">
+                <div className="clock-time">{liveTime}</div>
+                <div className="clock-date d-none d-sm-block">{liveDate}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+      <div className="container-fluid px-2 px-md-3 py-3" style={{ paddingBottom: '80px' }}>
+        <h4>Active Tab: {activeTab}</h4>
+      </div>
     </div>
   );
 }
