@@ -180,7 +180,9 @@ function App() {
             nama: row.nama,
             items: row.items || [],
             startTime: row.start_time || Date.now(),
-            payAwal: row.pay_awal || 'cash'
+            tanggal: row.tanggal || '',
+            payAwal: row.pay_awal || 'cash',
+            queueNo: row.queue_no || 0
           }));
           setActiveSessions(cs);
           safeSetItem('kw_sessions', JSON.stringify(cs));
@@ -200,6 +202,7 @@ function App() {
             nama: payload.new.nama,
             items: payload.new.items || [],
             startTime: payload.new.start_time || Date.now(),
+            tanggal: payload.new.tanggal || '',
             payAwal: payload.new.pay_awal || 'cash',
             queueNo: payload.new.queue_no || 0
           };
@@ -215,6 +218,7 @@ function App() {
             nama: payload.new.nama,
             items: payload.new.items || [],
             startTime: payload.new.start_time || Date.now(),
+            tanggal: payload.new.tanggal || '',
             payAwal: payload.new.pay_awal || 'cash',
             queueNo: payload.new.queue_no || 0
           };
@@ -603,6 +607,7 @@ function App() {
       nama,
       items,
       startTime: Date.now(),
+      tanggal: todayStr(),   // Locked at start — survives midnight rollover
       payAwal,
       queueNo: newQueueNo
     };
@@ -621,6 +626,7 @@ function App() {
         nama: session.nama,
         items: session.items,
         start_time: session.startTime,
+        tanggal: session.tanggal,
         pay_awal: session.payAwal,
         queue_no: session.queueNo
       }).then(({ error }) => {
@@ -730,7 +736,7 @@ function App() {
       no: txnNo,
       queueNo: session.queueNo || 0,
       nama: session.nama,
-      tanggal: todayStr(),
+      tanggal: session.tanggal || todayStr(), // Use start-day, fallback for old sessions
       startTime: session.startTime,
       endTime,
       items: itemStr,
