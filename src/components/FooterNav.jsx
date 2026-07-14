@@ -1,0 +1,40 @@
+import React from 'react';
+
+function FooterNav({ activeTab, onTabChange, activeCount }) {
+  return (
+    <nav className="footer-nav">
+      <button 
+        className={`fnav-btn ${activeTab === 'dashboard' ? 'active' : ''}`} 
+        onClick={() => onTabChange('dashboard')}
+      >
+        <div className="fnav-ico-wrap">
+          <i className="bi bi-grid-1x2-fill"></i>
+          <span className={`fnav-badge ${activeCount === 0 ? 'd-none' : ''}`}>{activeCount}</span>
+        </div>
+        <span className="fnav-label">Sewa &amp; Aktif</span>
+      </button>
+      
+      <button 
+        className={`fnav-btn ${activeTab === 'riwayat' ? 'active' : ''}`} 
+        onClick={() => onTabChange('riwayat')}
+      >
+        <div className="fnav-ico-wrap">
+          <i className="bi bi-clock-history"></i>
+        </div>
+        <span className="fnav-label">Riwayat</span>
+      </button>
+
+      <button 
+        className={`fnav-btn ${activeTab === 'pengaturan' ? 'active' : ''}`} 
+        onClick={() => onTabChange('pengaturan')}
+      >
+        <div className="fnav-ico-wrap">
+          <i className="bi bi-gear-fill"></i>
+        </div>
+        <span className="fnav-label">Pengaturan</span>
+      </button>
+    </nav>
+  );
+}
+
+export default FooterNav;

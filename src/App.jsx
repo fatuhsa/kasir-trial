@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import LoginPage from './components/LoginPage';
 import { sb } from './supabase';
 import DashboardTab from './components/DashboardTab';
+import FooterNav from './components/FooterNav';
 
 export const ITEMS = [
   { code:'ST',  name:'Stroller',          emoji:'🛺', defaultImg:'https://i.ibb.co.com/fzwMy2XL/The-Edit-The-stroller-changing-the-game-banner-desktop.webp', priceHour:20000, priceOT30:10000, priceOT60:20000 },
@@ -175,40 +176,19 @@ function App() {
             getImgUrl={getImgUrl}
           />
         )}
-        {activeTab !== 'dashboard' && <h4>Active Tab: {activeTab}</h4>}
+        {activeTab === 'riwayat' && (
+          <div className="panel p-4 text-center">Riwayat Tab (Task selanjutnya)</div>
+        )}
+        {activeTab === 'pengaturan' && (
+          <div className="panel p-4 text-center">Pengaturan Tab (Task selanjutnya)</div>
+        )}
       </div>
 
-      <nav className="footer-nav">
-        <button 
-          className={`fnav-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
-          id="fnav-dashboard" 
-          onClick={() => setActiveTab('dashboard')}
-        >
-          <div className="fnav-ico-wrap">
-            <i className="bi bi-grid-1x2-fill"></i>
-            {activeSessions.length > 0 && (
-              <span className="fnav-badge" id="badgeAktif">{activeSessions.length}</span>
-            )}
-          </div>
-          <span className="fnav-label">Sewa &amp; Aktif</span>
-        </button>
-        <button 
-          className={`fnav-btn ${activeTab === 'riwayat' ? 'active' : ''}`}
-          id="fnav-riwayat" 
-          onClick={() => setActiveTab('riwayat')}
-        >
-          <div className="fnav-ico-wrap"><i className="bi bi-clock-history"></i></div>
-          <span className="fnav-label">Riwayat</span>
-        </button>
-        <button 
-          className={`fnav-btn ${activeTab === 'pengaturan' ? 'active' : ''}`}
-          id="fnav-pengaturan" 
-          onClick={() => setActiveTab('pengaturan')}
-        >
-          <div className="fnav-ico-wrap"><i className="bi bi-gear-fill"></i></div>
-          <span className="fnav-label">Pengaturan</span>
-        </button>
-      </nav>
+      <FooterNav
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        activeCount={activeSessions.length}
+      />
     </div>
   );
 }
