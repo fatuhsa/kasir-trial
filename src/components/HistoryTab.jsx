@@ -119,11 +119,11 @@ function HistoryTab({ transactions, onPrintTxn, onDeleteTxn }) {
                   <th>No</th><th>Nama</th><th>Shift</th><th>Tgl</th><th>Waktu</th>
                   <th>Item</th><th>Tambahan</th><th>Dur OT</th>
                   <th className="th-pokok-cash"><i className="bi bi-cash-stack me-1"></i>Pokok (C)</th>
-                  <th className="th-pokok-qris"><i className="bi bi-qr-code-scan me-1"></i>Pokok (NC)</th>
+                  <th className="th-pokok-qris"><i className="bi bi-qr-code-scan me-1"></i>Pokok (QR)</th>
                   <th style={{ color: 'var(--green)' }}>Tambahan (C)</th>
-                  <th style={{ color: 'var(--cyan)' }}>Tambahan (NC)</th>
+                  <th style={{ color: 'var(--cyan)' }}>Tambahan (QR)</th>
                   <th style={{ color: 'var(--green)' }}>Total Cash</th>
-                  <th style={{ color: 'var(--cyan)' }}>Total Non-Cash</th>
+                  <th style={{ color: 'var(--cyan)' }}>Total QRIS</th>
                   <th>Grand Total</th><th>Aksi</th>
                 </tr>
               </thead>

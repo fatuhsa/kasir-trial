@@ -17,13 +17,6 @@ function PaymentModal({ bayarData, onClose, onFinalize }) {
       finalCash = grand;
     } else if (payMode === 'qris') {
       finalQris = grand;
-    } else {
-      finalCash = Number(cashAmt);
-      finalQris = Number(qrisAmt);
-      if (finalCash + finalQris !== grand) {
-        alert(`Jumlah Split (${fmtRp(finalCash + finalQris)}) tidak sama dengan total tagihan (${fmtRp(grand)})!`);
-        return;
-      }
     }
 
     onFinalize(finalCash, finalQris);
@@ -61,13 +54,6 @@ function PaymentModal({ bayarData, onClose, onFinalize }) {
                 >
                   📱 QRIS
                 </button>
-                <button 
-                  disabled={isNoOT}
-                  className={`btn flex-fill py-2 btn-outline-primary ${payMode === 'split' ? 'active' : ''}`}
-                  onClick={() => { setPayMode('split'); setCashAmt(Math.round(grand/2)); setQrisAmt(grand - Math.round(grand/2)); }}
-                >
-                  💳 Split
-                </button>
               </div>
 
               {payMode === 'cash' && (
@@ -94,38 +80,6 @@ function PaymentModal({ bayarData, onClose, onFinalize }) {
                 </div>
               )}
 
-              {payMode === 'split' && (
-                <div className="row g-2 mb-3">
-                  <div className="col-6">
-                    <label className="field-label">💵 Cash</label>
-                    <input 
-                      type="number" 
-                      className="cfield" 
-                      style={{ paddingLeft: '12px' }}
-                      value={cashAmt}
-                      onChange={(e) => {
-                        const val = Number(e.target.value);
-                        setCashAmt(val);
-                        setQrisAmt(grand - val);
-                      }} 
-                    />
-                  </div>
-                  <div className="col-6">
-                    <label className="field-label">📱 QRIS</label>
-                    <input 
-                      type="number" 
-                      className="cfield" 
-                      style={{ paddingLeft: '12px' }}
-                      value={qrisAmt}
-                      onChange={(e) => {
-                        const val = Number(e.target.value);
-                        setQrisAmt(val);
-                        setCashAmt(grand - val);
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
 
               <button className="btn-start w-100 mb-2" onClick={handleFinalize}>
                 <i className="bi bi-check-circle-fill me-2"></i>Konfirmasi Pembayaran
