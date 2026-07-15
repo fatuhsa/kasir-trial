@@ -86,30 +86,30 @@ function HistoryTab({ transactions, onPrintTxn, onDeleteTxn }) {
         </div>
         <div className="panel-body">
           <div className="row g-2 mb-3">
-            <div className="col-6 col-sm-2"><div className="sum-card"><div className="sum-label">Transaksi</div><div className="sum-val">{filtered.length}</div></div></div>
-            <div className="col-6 col-sm-2">
+            <div className="col-12 col-md-4 col-xl-2"><div className="sum-card"><div className="sum-label">Transaksi</div><div className="sum-val">{filtered.length}</div></div></div>
+            <div className="col-12 col-md-4 col-xl-2">
               <div className="sum-card">
                 <div className="sum-label">Total Pokok</div>
-                <div className="sum-val" style={{ color: 'var(--text2)' }}>{fmtRp(totalPokok)}</div>
+                <div className="sum-val" style={{ color: 'var(--text)' }}>{fmtRp(totalPokok)}</div>
                 <div className="sum-pokok-breakdown d-flex justify-content-between small text-secondary px-1" style={{ fontSize: '0.65rem' }}>
-                  <span className="sum-pokok-item cash text-success">C: {fmtRp(totalPokokCash)}</span>
-                  <span className="sum-pokok-item qris text-info">Q: {fmtRp(totalPokokQris)}</span>
+                  <span className="sum-pokok-item text-secondary" style={{ background: 'transparent', border: 'none', padding: 0 }}>C: {fmtRp(totalPokokCash)}</span>
+                  <span className="sum-pokok-item text-secondary" style={{ background: 'transparent', border: 'none', padding: 0 }}>Q: {fmtRp(totalPokokQris)}</span>
                 </div>
               </div>
             </div>
-            <div className="col-6 col-sm-2">
+            <div className="col-12 col-md-4 col-xl-2">
               <div className="sum-card">
                 <div className="sum-label">Total Tambahan</div>
-                <div className="sum-val clr-orange">{fmtRp(totalTambahan)}</div>
+                <div className="sum-val" style={{ color: 'var(--text)' }}>{fmtRp(totalTambahan)}</div>
                 <div className="sum-pokok-breakdown d-flex justify-content-between small text-secondary px-1" style={{ fontSize: '0.65rem' }}>
-                  <span className="sum-pokok-item cash text-success">C: {fmtRp(totalOTCash)}</span>
-                  <span className="sum-pokok-item qris text-info">Q: {fmtRp(totalOTQris)}</span>
+                  <span className="sum-pokok-item text-secondary" style={{ background: 'transparent', border: 'none', padding: 0 }}>C: {fmtRp(totalOTCash)}</span>
+                  <span className="sum-pokok-item text-secondary" style={{ background: 'transparent', border: 'none', padding: 0 }}>Q: {fmtRp(totalOTQris)}</span>
                 </div>
               </div>
             </div>
-            <div className="col-6 col-sm-2"><div className="sum-card"><div className="sum-label">Total Cash</div><div className="sum-val clr-green">{fmtRp(totalCashAll)}</div></div></div>
-            <div className="col-6 col-sm-2"><div className="sum-card"><div className="sum-label">Total QRIS</div><div className="sum-val clr-cyan">{fmtRp(totalQrisAll)}</div></div></div>
-            <div className="col-6 col-sm-2"><div className="sum-card"><div className="sum-label">Grand Total</div><div className="sum-val clr-yellow">{fmtRp(grandTotal)}</div></div></div>
+            <div className="col-12 col-md-4 col-xl-2"><div className="sum-card"><div className="sum-label">Total Cash</div><div className="sum-val" style={{ color: 'var(--text)' }}>{fmtRp(totalCashAll)}</div></div></div>
+            <div className="col-12 col-md-4 col-xl-2"><div className="sum-card"><div className="sum-label">Total QRIS</div><div className="sum-val" style={{ color: 'var(--text)' }}>{fmtRp(totalQrisAll)}</div></div></div>
+            <div className="col-12 col-md-4 col-xl-2"><div className="sum-card" style={{ borderColor: 'var(--cyan)', background: 'rgba(88,166,255,0.05)' }}><div className="sum-label clr-cyan">Grand Total</div><div className="sum-val clr-cyan">{fmtRp(grandTotal)}</div></div></div>
           </div>
           
           <div className="table-responsive">
@@ -129,7 +129,7 @@ function HistoryTab({ transactions, onPrintTxn, onDeleteTxn }) {
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
-                  <tr><td colSpan="16" className="text-center text-secondary py-4">Tidak ada transaksi</td></tr>
+                  <tr><td colSpan="16"><div className="empty-box"><i className="bi bi-receipt" style={{fontSize:'3.5rem', opacity:0.5}}></i><p>Tidak ada transaksi di tanggal ini</p></div></td></tr>
                 ) : (
                   filtered.map((t, idx) => {
                     const isCash = (t.payAwal || 'cash') === 'cash';

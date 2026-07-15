@@ -11,7 +11,7 @@
   --header-bg:linear-gradient(90deg,#1c2128 0%,#24292f 60%,#0d2040 100%);
 }
 *,*::before,*::after{box-sizing:border-box}
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:15px;min-height:100vh;padding-bottom:72px;transition:background .2s,color .2s;letter-spacing:-0.01em}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:16px;min-height:100vh;padding-bottom:72px;transition:background .2s,color .2s;letter-spacing:-0.01em}
 /* LOGIN */
 #loginPage{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;align-items:center;justify-content:center;min-height:100vh}
 .login-card{background:var(--bg2);border:1.5px solid var(--border);border-radius:20px;padding:40px 36px 36px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.35);text-align:center}
@@ -126,7 +126,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-
 .ctable{width:100%;border-collapse:collapse;font-size:.83rem}
 .ctable thead{background:var(--bg3)}
 .ctable th{padding:10px 10px;text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);white-space:nowrap;border-bottom:1px solid var(--border)}
-.ctable td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+.ctable td{padding:6px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
 .ctable tr:last-child td{border-bottom:none}
 .ctable tbody tr:hover td{background:rgba(31,111,235,.06)}
 .badge-c{background:rgba(63,185,80,.2);color:#3fb950;font-size:.72rem;font-weight:800;padding:2px 7px;border-radius:5px}

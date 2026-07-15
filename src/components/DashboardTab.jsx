@@ -139,9 +139,11 @@ function DashboardTab({ activeSessions, onStartSewa, getImgUrl, onSelesaiSewa, o
               </div>
               <div className="aktif-scroll">
                 {filteredSessions.length === 0 ? (
-                  <div className="empty-box"><i className="bi bi-hourglass-split"></i><p>Belum ada penyewa aktif</p></div>
+                  <div className="empty-box"><i className="bi bi-person-slash" style={{fontSize:'3.5rem', opacity:0.5}}></i><p>Belum ada penyewa aktif</p></div>
                 ) : (
-                  filteredSessions.map(s => {
+                  [...filteredSessions]
+                    .sort((a, b) => (sessionDurations[b.id] || 0) - (sessionDurations[a.id] || 0))
+                    .map(s => {
                     const elapsedSec = sessionDurations[s.id] || 0;
                     // Determine status dot
                     const pkgItem = s.items.find(it => {
@@ -153,8 +155,15 @@ function DashboardTab({ activeSessions, onStartSewa, getImgUrl, onSelesaiSewa, o
                     const overMin = (elapsedSec / 60) - limitMin;
                     
                     let dotClass = 'dot dot-ok';
-                    if (overMin > 25) dotClass = 'dot dot-hot';
-                    else if (overMin > 10) dotClass = 'dot dot-warn';
+                    let btnColor = 'linear-gradient(135deg, var(--green), #16a34a)';
+                    
+                    if (overMin >= 11) {
+                      dotClass = 'dot dot-hot';
+                      btnColor = 'linear-gradient(135deg, var(--red), #dc2626)'; // urgent
+                    } else if (overMin >= 0) {
+                      dotClass = 'dot dot-warn';
+                      btnColor = 'linear-gradient(135deg, var(--orange), #f59e0b)'; // grace period
+                    }
 
                     // Zombie session warning: active > 8 hours
                     const isZombie = elapsedSec > 28800;
@@ -178,26 +187,25 @@ function DashboardTab({ activeSessions, onStartSewa, getImgUrl, onSelesaiSewa, o
                             {s.payAwal.toUpperCase()}
                           </span>
                         </div>
-                        <div className="item-tags">
+                        <div className="item-tags mb-2">
                           {s.items.map(it => (
                             <span className="itag" key={it.code}>{it.code}×{it.qty}</span>
                           ))}
                         </div>
-                        <div className="aktif-meta">
+                        <div className="aktif-meta mb-2">
                           <span className="aktif-start-lbl">
                             <i className="bi bi-clock me-1"></i>
                             {new Date(s.startTime).toTimeString().slice(0,5)}
                           </span>
-                          <span className="aktif-timer">{fmtDur(elapsedSec)}</span>
+                          <span className="aktif-timer fw-bolder fs-5" style={{ letterSpacing: '0px', color: overMin >= 11 ? 'var(--red)' : 'var(--cyan)' }}>{fmtDur(elapsedSec)}</span>
                         </div>
-                        <div className="aktif-footer">
-                          <button className="btn-selesai" onClick={() => onSelesaiSewa(s)}>
-                            <i className="bi bi-stop-circle-fill me-1"></i>Selesai &amp; Bayar
+                        <div className="aktif-footer d-flex gap-2 align-items-center mt-auto">
+                          <button className="btn-selesai flex-fill" style={{ background: btnColor }} onClick={() => onSelesaiSewa(s)}>
+                            <i className="bi bi-stop-circle-fill me-1"></i>Selesai
                           </button>
-                          <button className="btn-qr-aktif" onClick={() => onShowQR(s)} title="Tampilkan QR"><i className="bi bi-qr-code"></i></button>
+                          <button className="btn-qr-aktif ms-1" onClick={() => onShowQR(s)} title="Tampilkan QR"><i className="bi bi-qr-code"></i></button>
                           <button className="btn-qr-aktif" style={{ background: 'var(--bg-sec)', color: 'var(--cyan)', border: '1px solid var(--cyan)' }} onClick={() => onPrintSesi(s)} title="Print Struk"><i className="bi bi-printer-fill"></i></button>
-                          <button className="btn-edit-aktif" onClick={() => onEditSesi(s)} title="Edit"><i className="bi bi-pencil-fill"></i></button>
-                          <span className={dotClass}></span>
+                          <button className="btn-edit-aktif me-1" onClick={() => onEditSesi(s)} title="Edit"><i className="bi bi-pencil-fill"></i></button>
                         </div>
                       </div>
                     );
