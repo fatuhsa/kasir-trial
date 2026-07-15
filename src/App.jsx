@@ -855,7 +855,7 @@ function App() {
             </div>
             <div className="d-flex align-items-center gap-2 gap-md-3">
               <div className="shift-indicator d-flex" onClick={handleLogout}>
-                <span className="shift-dot"></span>
+                <i className="bi bi-person-fill" style={{ color: 'var(--green)', fontSize: '1.1rem' }}></i>
                 <span>{currentShiftUser}</span>
                 <i className="bi bi-box-arrow-right ms-1" style={{ fontSize: '.75rem', opacity: .6 }}></i>
               </div>
