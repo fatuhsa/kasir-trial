@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ITEMS, fmtRp, fmtDur } from '../App';
 
-function DashboardTab({ activeSessions, onStartSewa, getImgUrl, onSelesaiSewa, onShowQR, onEditSesi }) {
+function DashboardTab({ activeSessions, onStartSewa, getImgUrl, onSelesaiSewa, onShowQR, onPrintSesi, onEditSesi }) {
   const [inputNama, setInputNama] = useState('');
   const [payAwal, setPayAwal] = useState('cash');
   const [selectedQty, setSelectedQty] = useState({});
@@ -194,8 +194,9 @@ function DashboardTab({ activeSessions, onStartSewa, getImgUrl, onSelesaiSewa, o
                           <button className="btn-selesai" onClick={() => onSelesaiSewa(s)}>
                             <i className="bi bi-stop-circle-fill me-1"></i>Selesai &amp; Bayar
                           </button>
-                          <button className="btn-qr-aktif" onClick={() => onShowQR(s)}><i className="bi bi-qr-code"></i></button>
-                          <button className="btn-edit-aktif" onClick={() => onEditSesi(s)}><i className="bi bi-pencil-fill"></i></button>
+                          <button className="btn-qr-aktif" onClick={() => onShowQR(s)} title="Tampilkan QR"><i className="bi bi-qr-code"></i></button>
+                          <button className="btn-qr-aktif" style={{ background: 'var(--bg-sec)', color: 'var(--cyan)', border: '1px solid var(--cyan)' }} onClick={() => onPrintSesi(s)} title="Print Struk"><i className="bi bi-printer-fill"></i></button>
+                          <button className="btn-edit-aktif" onClick={() => onEditSesi(s)} title="Edit"><i className="bi bi-pencil-fill"></i></button>
                           <span className={dotClass}></span>
                         </div>
                       </div>

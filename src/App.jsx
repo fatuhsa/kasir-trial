@@ -899,6 +899,7 @@ function App() {
             getImgUrl={getImgUrl}
             onSelesaiSewa={(session) => setActiveCheckoutSession(session)}
             onShowQR={(session) => setActiveQRModalSession(session)}
+            onPrintSesi={handlePrintMulai}
             onEditSesi={(session) => {
               setPendingAction({ type: 'editSession', session });
             }}
@@ -907,6 +908,7 @@ function App() {
         {activeTab === 'riwayat' && (
           <HistoryTab
             transactions={transactions}
+            onPrintTxn={handlePrintSelesai}
             onDeleteTxn={(id) => {
               setPendingAction({ type: 'deleteTxn', id });
             }}

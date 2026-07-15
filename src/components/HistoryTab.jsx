@@ -20,7 +20,7 @@ const dateStr = ts => {
 
 const timeStr = ts => new Date(ts).toTimeString().slice(0,5);
 
-function HistoryTab({ transactions, onDeleteTxn }) {
+function HistoryTab({ transactions, onPrintTxn, onDeleteTxn }) {
   const getLocalDateString = () => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -155,7 +155,8 @@ function HistoryTab({ transactions, onDeleteTxn }) {
                         <td><span style={{ fontWeight: 800, color: 'var(--cyan)' }}>{fmtRp(pokokQris + (t.qris || 0))}</span></td>
                         <td><span style={{ fontWeight: 800, color: 'var(--yellow)' }}>{fmtRp(t.totalAll || ((t.totalBase || 0) + (t.grandTotal || 0)))}</span></td>
                         <td>
-                          <button className="act-btn" onClick={() => onDeleteTxn(t.id)}><i className="bi bi-trash3-fill clr-red"></i></button>
+                          <button className="act-btn me-2" onClick={() => onPrintTxn(t)} title="Print Struk"><i className="bi bi-printer-fill text-secondary"></i></button>
+                          <button className="act-btn" onClick={() => onDeleteTxn(t.id)} title="Hapus"><i className="bi bi-trash3-fill clr-red"></i></button>
                         </td>
                       </tr>
                     );
