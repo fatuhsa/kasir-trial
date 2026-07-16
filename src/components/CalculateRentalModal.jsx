@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ITEMS, fmtRp, fmtDur } from '../App';
+import { calcOT } from '../lib/ot';
 
 function CalculateRentalModal({ session, onClose, onProceedPayment }) {
   const [elapsed, setElapsed] = useState(() => Math.floor((Date.now() - session.startTime) / 1000));
@@ -17,22 +18,14 @@ function CalculateRentalModal({ session, onClose, onProceedPayment }) {
       const def = ITEMS.find(item => item.code === it.code);
       const limitMin = def && def.isPackage ? def.packageHours * 60 : 60;
       
-      let otFull = 0, otHalf = 0;
-      const actualOver = elMin - limitMin;
-      if (Math.floor(actualOver) >= 11) {
-        const cycles = Math.floor(actualOver / 60);
-        const remainder = actualOver % 60;
-        otFull = cycles;
-        if (remainder > 10 && remainder <= 40) otHalf = 1;
-        else if (remainder > 40) otFull += 1;
-      }
-
+      const { otFull, otHalf } = calcOT(elMin, limitMin);
       const otCost = (otFull * def.priceOT60 + otHalf * def.priceOT30) * it.qty;
 
       return {
         ...it,
         def,
         limitMin,
+        returnQty: it.qty,
         baseCost: def.priceHour * it.qty,
         otFullCount: otFull,
         otHalfCount: otHalf,
@@ -77,8 +70,24 @@ function CalculateRentalModal({ session, onClose, onProceedPayment }) {
       if (i !== idx) return it;
       const updated = { ...it };
       updated[field] = Math.max(0, updated[field] + delta);
-      updated.otCost = (updated.otFullCount * updated.def.priceOT60 + updated.otHalfCount * updated.def.priceOT30) * updated.qty;
+      updated.otCost = (updated.otFullCount * updated.def.priceOT60 + updated.otHalfCount * updated.def.priceOT30) * updated.returnQty;
       return updated;
+    }));
+  };
+
+  const handleReturnQtyChange = (idx, delta) => {
+    setItemsCalc(prev => prev.map((it, i) => {
+      if (i !== idx) return it;
+      const newReturnQty = Math.max(0, Math.min(it.qty, it.returnQty + delta));
+      const baseCost = it.def.priceHour * newReturnQty;
+      const otCost = (it.otFullCount * it.def.priceOT60 + it.otHalfCount * it.def.priceOT30) * newReturnQty;
+      return {
+        ...it,
+        returnQty: newReturnQty,
+        baseCost,
+        otCost,
+        bakCost: (it.bakFull * it.def.priceOT60 + it.bakHalf * it.def.priceOT30) * newReturnQty
+      };
     }));
   };
 
@@ -86,20 +95,24 @@ function CalculateRentalModal({ session, onClose, onProceedPayment }) {
   const otSum = itemsCalc.reduce((sum, it) => sum + (it.tolOn ? 0 : it.otCost), 0);
   const grandOT = Math.max(0, otSum + manualAdj);
 
-  const isOT = itemsCalc.some(it => Math.floor(elapsedMin - it.limitMin) >= 11);
+  const isOT = itemsCalc.some(it => it.returnQty > 0 && Math.floor(elapsedMin - it.limitMin) >= 11);
   const maxOver = Math.max(...itemsCalc.map(it => {
     const o = elapsedMin - it.limitMin;
-    return Math.floor(o) >= 11 ? o : 0;
+    return it.returnQty > 0 && Math.floor(o) >= 11 ? o : 0;
   }));
+
+  const isMultiItem = session.items.length > 1 || session.items.some(i => i.qty > 1);
+  const totalReturnQty = itemsCalc.reduce((sum, it) => sum + it.returnQty, 0);
+  const canProceed = totalReturnQty > 0;
 
   const handleProceed = () => {
     const otStr = itemsCalc
-      .filter(it => !it.tolOn && (it.otFullCount > 0 || it.otHalfCount > 0))
+      .filter(it => !it.tolOn && it.returnQty > 0 && (it.otFullCount > 0 || it.otHalfCount > 0))
       .map(it => `${it.code}(${it.otFullCount > 0 ? it.otFullCount + '×1j' : ''}${it.otHalfCount > 0 ? (it.otFullCount > 0 ? '+' : '') + it.otHalfCount + '×½j' : ''})`)
       .join(', ');
     
     const otDurStr = itemsCalc
-      .filter(it => !it.tolOn && (it.otFullCount > 0 || it.otHalfCount > 0))
+      .filter(it => !it.tolOn && it.returnQty > 0 && (it.otFullCount > 0 || it.otHalfCount > 0))
       .map(it => `${it.code}:${it.otFullCount * 60 + it.otHalfCount * 30}m`)
       .join(', ');
 
@@ -159,9 +172,10 @@ function CalculateRentalModal({ session, onClose, onProceedPayment }) {
               <div className="mb-3">
                 {itemsCalc.map((it, idx) => {
                   const overMin = elapsedMin - it.limitMin;
+                  const isReturned = it.returnQty > 0;
                   const otLabel = [];
-                  if (it.otFullCount > 0) otLabel.push(`${it.otFullCount}× 1Jam (${fmtRp(it.def.priceOT60 * it.qty * it.otFullCount)})`);
-                  if (it.otHalfCount > 0) otLabel.push(`${it.otHalfCount}× ½Jam (${fmtRp(it.def.priceOT30 * it.qty * it.otHalfCount)})`);
+                  if (it.otFullCount > 0) otLabel.push(`${it.otFullCount}× 1Jam (${fmtRp(it.def.priceOT60 * it.returnQty * it.otFullCount)})`);
+                  if (it.otHalfCount > 0) otLabel.push(`${it.otHalfCount}× ½Jam (${fmtRp(it.def.priceOT30 * it.returnQty * it.otHalfCount)})`);
                   
                   let overStatus = '';
                   if (overMin <= 0) overStatus = 'Normal';
@@ -169,33 +183,52 @@ function CalculateRentalModal({ session, onClose, onProceedPayment }) {
                   else overStatus = `Over ${Math.floor(overMin)}m`;
 
                   return (
-                    <div className={`breakdown-item ${it.tolOn ? 'item-tolerated' : ''}`} key={it.code}>
+                    <div className={`breakdown-item ${it.tolOn ? 'item-tolerated' : ''} ${!isReturned ? 'opacity-75' : ''}`} key={it.code}>
                       <div className="d-flex justify-content-between align-items-start gap-2">
                         <div className="flex-fill">
                           <div className="bi-name">{it.code} - {it.def.name} ×{it.qty}</div>
                           <div className="small text-secondary mb-1">{overStatus}</div>
-                          <div className={`ot-auto-detail ${it.tolOn ? 'ot-detail-striked' : ''}`}>
-                            {otLabel.length > 0 ? otLabel.join(' + ') : 'Tidak ada overtime'}
-                          </div>
-                          {!it.tolOn && overMin > 0 && (
-                            <div className="ot-manual-row mt-2">
-                              <span className="ot-manual-lbl">1 Jam: </span>
-                              <button className="ot-count-btn" onClick={() => adjustOTQty(idx, 'otFullCount', -1)}>−</button>
-                              <span className="mx-2">{it.otFullCount}</span>
-                              <button className="ot-count-btn" onClick={() => adjustOTQty(idx, 'otFullCount', 1)}>+</button>
-                              <span className="ot-manual-lbl ms-3">½ Jam: </span>
-                              <button className="ot-count-btn" onClick={() => adjustOTQty(idx, 'otHalfCount', -1)}>−</button>
-                              <span className="mx-2">{it.otHalfCount}</span>
-                              <button className="ot-count-btn" onClick={() => adjustOTQty(idx, 'otHalfCount', 1)}>+</button>
+                          
+                          {isMultiItem && (
+                            <div className="d-flex align-items-center gap-2 mt-1 mb-2 p-1 px-2 rounded" style={{ background: 'var(--bg-sec)', width: 'fit-content' }}>
+                              <span className="small text-secondary" style={{ fontSize: '0.72rem' }}>Kembalikan:</span>
+                              <button className="ot-count-btn" onClick={() => handleReturnQtyChange(idx, -1)}>−</button>
+                              <span className="fw-bold" style={{ minWidth: '15px', textAlign: 'center', fontSize: '0.8rem' }}>{it.returnQty}</span>
+                              <button className="ot-count-btn" onClick={() => handleReturnQtyChange(idx, 1)}>+</button>
+                              <span className="small text-secondary" style={{ fontSize: '0.72rem' }}>/ {it.qty}</span>
                             </div>
                           )}
-                          <label className="tol-toggle-label mt-2">
-                            <input type="checkbox" checked={it.tolOn} onChange={(e) => handleTolToggle(idx, e.target.checked)} />
-                            <span className="ms-2 small">Toleransi / Hapus OT</span>
-                          </label>
+
+                          {!isReturned ? (
+                            <span className="badge bg-secondary mt-1" style={{ fontSize: '0.65rem' }}>TETAP DISEWA (Belum Dikembalikan)</span>
+                          ) : (
+                            <>
+                              <div className={`ot-auto-detail ${it.tolOn ? 'ot-detail-striked' : ''}`}>
+                                {otLabel.length > 0 ? otLabel.join(' + ') : 'Tidak ada overtime'}
+                              </div>
+                              {!it.tolOn && overMin > 0 && (
+                                <div className="ot-manual-row mt-2">
+                                  <span className="ot-manual-lbl">1 Jam: </span>
+                                  <button className="ot-count-btn" onClick={() => adjustOTQty(idx, 'otFullCount', -1)}>−</button>
+                                  <span className="mx-2">{it.otFullCount}</span>
+                                  <button className="ot-count-btn" onClick={() => adjustOTQty(idx, 'otFullCount', 1)}>+</button>
+                                  <span className="ot-manual-lbl ms-3">½ Jam: </span>
+                                  <button className="ot-count-btn" onClick={() => adjustOTQty(idx, 'otHalfCount', -1)}>−</button>
+                                  <span className="mx-2">{it.otHalfCount}</span>
+                                  <button className="ot-count-btn" onClick={() => adjustOTQty(idx, 'otHalfCount', 1)}>+</button>
+                                </div>
+                              )}
+                              <label className="tol-toggle-label mt-2">
+                                <input type="checkbox" checked={it.tolOn} onChange={(e) => handleTolToggle(idx, e.target.checked)} />
+                                <span className="ms-2 small">Toleransi / Hapus OT</span>
+                              </label>
+                            </>
+                          )}
                         </div>
                         <div className="text-end">
-                          {it.tolOn ? (
+                          {!isReturned ? (
+                            <span className="text-secondary small">—</span>
+                          ) : it.tolOn ? (
                             <span className="badge bg-success">GRATIS</span>
                           ) : (
                             <span className="bi-price">{fmtRp(it.otCost)}</span>
@@ -206,6 +239,26 @@ function CalculateRentalModal({ session, onClose, onProceedPayment }) {
                   );
                 })}
               </div>
+
+              {isMultiItem && (
+                <div className="mb-3 p-2 rounded border" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.1)' }}>
+                  <div className="small text-secondary mb-1" style={{ fontSize: '0.75rem' }}><i className="bi bi-info-circle-fill me-1 text-info"></i>Status Sisa Sewa Aktif (Akan Terus Berjalan):</div>
+                  <div className="d-flex gap-2 flex-wrap mt-1">
+                    {itemsCalc.map(it => {
+                      const rem = it.qty - it.returnQty;
+                      if (rem <= 0) return null;
+                      return (
+                        <span key={it.code} className="badge bg-dark border text-warning" style={{ borderColor: 'rgba(249,115,22,.3)', fontSize: '0.72rem' }}>
+                          {it.code} ×{rem}
+                        </span>
+                      );
+                    })}
+                    {itemsCalc.every(it => it.qty - it.returnQty === 0) && (
+                      <span className="text-success small" style={{ fontSize: '0.72rem' }}><i className="bi bi-check-circle-fill me-1"></i>Semua item dikembalikan (Sesi akan ditutup)</span>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="grand-total-box mt-3">
                 <div className="gt-label">Total Tagihan Overtime</div>
@@ -229,7 +282,7 @@ function CalculateRentalModal({ session, onClose, onProceedPayment }) {
 
               <div className="d-flex gap-2 mt-4">
                 <button className="btn-sec flex-fill" onClick={onClose}>Batal</button>
-                <button className="btn-start flex-fill" onClick={handleProceed}>
+                <button className="btn-start flex-fill" onClick={handleProceed} disabled={!canProceed} style={{ opacity: canProceed ? 1 : 0.5, cursor: canProceed ? 'pointer' : 'not-allowed' }}>
                   <i className="bi bi-credit-card-fill me-2"></i>Lanjut ke Pembayaran
                 </button>
               </div>

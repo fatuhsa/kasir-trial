@@ -77,6 +77,85 @@ describe('claim_and_delete_session logic', () => {
   });
 });
 
+describe('claim_and_update_session logic', () => {
+  it('updates the session items when expected_items matches', () => {
+    let sessions = [{ id: 'sess-1', items: [{ code: 'ST', qty: 1 }, { code: 'SD', qty: 2 }] }];
+
+    function claimAndUpdateLocally(id, expectedItems, newItems) {
+      const idx = sessions.findIndex(s => s.id === id);
+      if (idx === -1) return false;
+      const session = sessions[idx];
+      // Compare expected items (simplified JSON equality)
+      if (JSON.stringify(session.items) !== JSON.stringify(expectedItems)) {
+        return false;
+      }
+      if (newItems.length === 0) {
+        sessions.splice(idx, 1);
+      } else {
+        sessions[idx] = { ...session, items: newItems };
+      }
+      return true;
+    }
+
+    const expected = [{ code: 'ST', qty: 1 }, { code: 'SD', qty: 2 }];
+    const nextItems = [{ code: 'SD', qty: 2 }];
+    const res = claimAndUpdateLocally('sess-1', expected, nextItems);
+    expect(res).toBe(true);
+    expect(sessions[0].items).toEqual([{ code: 'SD', qty: 2 }]);
+  });
+
+  it('fails update if another terminal already updated the items (expected_items mismatch)', () => {
+    let sessions = [{ id: 'sess-1', items: [{ code: 'SD', qty: 2 }] }]; // already updated by Terminal A
+
+    function claimAndUpdateLocally(id, expectedItems, newItems) {
+      const idx = sessions.findIndex(s => s.id === id);
+      if (idx === -1) return false;
+      const session = sessions[idx];
+      if (JSON.stringify(session.items) !== JSON.stringify(expectedItems)) {
+        return false;
+      }
+      if (newItems.length === 0) {
+        sessions.splice(idx, 1);
+      } else {
+        sessions[idx] = { ...session, items: newItems };
+      }
+      return true;
+    }
+
+    // Terminal B tries to checkout using the old expected items (ST:1, SD:2)
+    const oldExpected = [{ code: 'ST', qty: 1 }, { code: 'SD', qty: 2 }];
+    const nextItems = [];
+    const res = claimAndUpdateLocally('sess-1', oldExpected, nextItems);
+    expect(res).toBe(false); // fails!
+    expect(sessions[0].items).toEqual([{ code: 'SD', qty: 2 }]); // untouched
+  });
+
+  it('deletes session completely if new items is empty', () => {
+    let sessions = [{ id: 'sess-1', items: [{ code: 'ST', qty: 1 }] }];
+
+    function claimAndUpdateLocally(id, expectedItems, newItems) {
+      const idx = sessions.findIndex(s => s.id === id);
+      if (idx === -1) return false;
+      const session = sessions[idx];
+      if (JSON.stringify(session.items) !== JSON.stringify(expectedItems)) {
+        return false;
+      }
+      if (newItems.length === 0) {
+        sessions.splice(idx, 1);
+      } else {
+        sessions[idx] = { ...session, items: newItems };
+      }
+      return true;
+    }
+
+    const expected = [{ code: 'ST', qty: 1 }];
+    const nextItems = [];
+    const res = claimAndUpdateLocally('sess-1', expected, nextItems);
+    expect(res).toBe(true);
+    expect(sessions.length).toBe(0);
+  });
+});
+
 // ─── 3. Midnight rollover — tanggal locked at start ──────────────────────────
 
 describe('midnight-spanning shift — tanggal', () => {

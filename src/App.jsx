@@ -170,8 +170,15 @@ function App() {
             qris: row.qris || 0,
             shift: row.shift || '-'
           }));
-          setTransactions(ct);
-          safeSetItem('kw_txns', JSON.stringify(ct));
+
+          // Merge local offline-only transactions
+          const dbIds = new Set(ct.map(t => t.id));
+          const localTxns = JSON.parse(localStorage.getItem('kw_txns') || '[]');
+          const offlineTxns = localTxns.filter(t => !dbIds.has(t.id));
+          const mergedTxns = [...ct, ...offlineTxns].sort((a, b) => (a.no || 0) - (b.no || 0));
+
+          setTransactions(mergedTxns);
+          safeSetItem('kw_txns', JSON.stringify(mergedTxns));
         }
 
         const { data: sess } = await sb.from('active_sessions').select('*');
@@ -185,8 +192,15 @@ function App() {
             payAwal: row.pay_awal || 'cash',
             queueNo: row.queue_no || 0
           }));
-          setActiveSessions(cs);
-          safeSetItem('kw_sessions', JSON.stringify(cs));
+
+          // Merge local offline-only active sessions
+          const dbIds = new Set(cs.map(s => s.id));
+          const localSessions = JSON.parse(localStorage.getItem('kw_sessions') || '[]');
+          const offlineSessions = localSessions.filter(s => !dbIds.has(s.id));
+          const mergedSessions = [...cs, ...offlineSessions];
+
+          setActiveSessions(mergedSessions);
+          safeSetItem('kw_sessions', JSON.stringify(mergedSessions));
         }
       } catch (err) {
         console.error('Supabase auto connect failed:', err);
@@ -315,9 +329,8 @@ function App() {
       // Pull transactions
       const { data: txns, error: errT } = await sb.from('transactions').select('*').order('no', { ascending: true }).limit(5000);
       if (errT) throw errT;
-      let mergedTxns = [...transactions];
       if (txns) {
-        mergedTxns = txns.map(row => ({
+        const ct = txns.map(row => ({
           id: row.id,
           no: row.no || 0,
           nama: row.nama,
@@ -337,24 +350,36 @@ function App() {
           qris: row.qris || 0,
           shift: row.shift || '-'
         }));
-        setTransactions(mergedTxns);
-        safeSetItem('kw_txns', JSON.stringify(mergedTxns));
+
+        // Merge offline-only transactions
+        const dbIds = new Set(ct.map(t => t.id));
+        const offlineTxns = transactions.filter(t => !dbIds.has(t.id));
+        const finalTxns = [...ct, ...offlineTxns].sort((a, b) => (a.no || 0) - (b.no || 0));
+
+        setTransactions(finalTxns);
+        safeSetItem('kw_txns', JSON.stringify(finalTxns));
       }
 
       // Pull active sessions
       const { data: sess, error: errS } = await sb.from('active_sessions').select('*');
       if (errS) throw errS;
-      let mergedSessions = [...activeSessions];
       if (sess) {
-        mergedSessions = sess.map(row => ({
+        const cs = sess.map(row => ({
           id: row.id,
           nama: row.nama,
           items: row.items || [],
           startTime: row.start_time || Date.now(),
-          payAwal: row.pay_awal || 'cash'
+          payAwal: row.pay_awal || 'cash',
+          queueNo: row.queue_no || 0
         }));
-        setActiveSessions(mergedSessions);
-        safeSetItem('kw_sessions', JSON.stringify(mergedSessions));
+
+        // Merge offline-only active sessions
+        const dbIds = new Set(cs.map(s => s.id));
+        const offlineSessions = activeSessions.filter(s => !dbIds.has(s.id));
+        const finalSessions = [...cs, ...offlineSessions];
+
+        setActiveSessions(finalSessions);
+        safeSetItem('kw_sessions', JSON.stringify(finalSessions));
       }
 
       // Pull settings
@@ -694,22 +719,41 @@ function App() {
   const handleFinalizePayment = async (cash, qris) => {
     if (!activePaymentData) return;
     const { session, itemsCalc, base, ot, tol, grand, otStr, otDurStr, elapsed, endTime } = activePaymentData;
-    const itemStr = session.items.map(i => `${i.code}×${i.qty}`).join(', ');
+    
+    // Calculate items checked out in this transaction
+    const itemStr = itemsCalc
+      .filter(it => it.returnQty > 0)
+      .map(it => `${it.code}×${it.returnQty}`)
+      .join(', ');
+
+    // Calculate items remaining in the active session
+    const remainingItems = session.items.map(orig => {
+      const calc = itemsCalc.find(it => it.code === orig.code);
+      const returned = calc ? calc.returnQty : 0;
+      return {
+        code: orig.code,
+        qty: orig.qty - returned
+      };
+    }).filter(it => it.qty > 0);
 
     // ── Atomic claim: prevent double-checkout race condition ──────────────
-    // When online, atomically delete session in DB. If another terminal
-    // already deleted it (returned false), abort and show error.
+    // When online, atomically delete or update session in DB. If another terminal
+    // already modified/deleted it (returned false), abort and show error.
     if (sbConnected) {
       try {
-        const { data: claimed, error: claimErr } = await sb.rpc('claim_and_delete_session', { p_id: session.id });
+        const { data: claimed, error: claimErr } = await sb.rpc('claim_and_update_session', { 
+          p_id: session.id,
+          p_expected_items: session.items,
+          p_new_items: remainingItems
+        });
         if (claimErr) throw claimErr;
         if (!claimed) {
-          alert('⚠️ Sesi ini sudah diselesaikan oleh terminal lain.\nPembayaran dibatalkan.');
+          alert('⚠️ Sesi ini sudah diselesaikan atau diubah oleh terminal lain.\nPembayaran dibatalkan.');
           setActivePaymentData(null);
           return;
         }
       } catch (e) {
-        console.warn('claim_and_delete_session failed, proceeding offline:', e);
+        console.warn('claim_and_update_session failed, proceeding offline:', e);
         // Network error → fall through to local-only mode
       }
     }
@@ -726,7 +770,7 @@ function App() {
     }
 
     const txn = {
-      id: session.id,
+      id: remainingItems.length > 0 ? crypto.randomUUID() : session.id, // Keep session ID only on final return
       no: txnNo,
       queueNo: session.queueNo || 0,
       nama: session.nama,
@@ -752,7 +796,12 @@ function App() {
     setTransactions(newTxns);
     safeSetItem('kw_txns', JSON.stringify(newTxns));
 
-    const newSessions = activeSessions.filter(s => s.id !== session.id);
+    let newSessions;
+    if (remainingItems.length > 0) {
+      newSessions = activeSessions.map(s => s.id === session.id ? { ...s, items: remainingItems } : s);
+    } else {
+      newSessions = activeSessions.filter(s => s.id !== session.id);
+    }
     setActiveSessions(newSessions);
     safeSetItem('kw_sessions', JSON.stringify(newSessions));
 
@@ -761,7 +810,7 @@ function App() {
     }
 
     if (sbConnected) {
-      // Session already deleted by claim_and_delete_session above — only insert txn
+      // Session already deleted/updated by claim_and_update_session above — only insert txn
       sb.from('transactions').insert({
         id: txn.id,
         no: txn.no,
@@ -787,7 +836,7 @@ function App() {
         else console.log('Transaction logged to Supabase, no:', txn.no);
       });
     } else {
-      // Offline: also delete session locally (already done above) — no DB action
+      // Offline: session already updated/deleted locally — no DB action
       console.warn('Offline: transaction saved to localStorage only');
     }
 
