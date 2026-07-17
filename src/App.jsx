@@ -624,7 +624,17 @@ function App() {
   };
 
   const handleStartSewa = (nama, items, payAwal) => {
-    const newQueueNo = shiftQueueNo + 1;
+    const today = todayStr();
+    let maxQueue = 0;
+    
+    activeSessions.forEach(s => {
+      if (s.tanggal === today && s.queueNo > maxQueue) maxQueue = s.queueNo;
+    });
+    transactions.forEach(t => {
+      if (t.tanggal === today && t.queueNo > maxQueue) maxQueue = t.queueNo;
+    });
+    
+    const newQueueNo = maxQueue + 1;
     setShiftQueueNo(newQueueNo);
     localStorage.setItem('kw_shiftQNo', newQueueNo);
 
@@ -633,7 +643,7 @@ function App() {
       nama,
       items,
       startTime: Date.now(),
-      tanggal: todayStr(),   // Locked at start — survives midnight rollover
+      tanggal: today,   // Locked at start — survives midnight rollover
       payAwal,
       queueNo: newQueueNo
     };
