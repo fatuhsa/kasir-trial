@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { ITEMS } from '../App';
 
-const APP_VERSION = '1.2.0';
-const DEPLOY_DATE = '14 Jul 2026';
+const APP_VERSION = '1.3.0';
+const DEPLOY_DATE = '17 Jul 2026';
 
 function SettingsTab({ 
   theme, 
