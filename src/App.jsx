@@ -81,6 +81,10 @@ function App() {
     const cName = user.charAt(0).toUpperCase() + user.slice(1);
     setCurrentShiftUser(cName);
     localStorage.setItem('kw_currentUser', cName);
+    
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    localStorage.setItem('kw_shiftDate', today);
   };
 
   const handleLogout = () => {
@@ -137,6 +141,26 @@ function App() {
       const days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
       const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
       setLiveDate(`${days[now.getDay()]} , ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`);
+
+      const savedUser = localStorage.getItem('kw_currentUser');
+      if (savedUser) {
+        let shiftDate = localStorage.getItem('kw_shiftDate');
+        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        
+        // Auto-fix missing shiftDate for backwards compatibility
+        if (!shiftDate) {
+          shiftDate = today;
+          localStorage.setItem('kw_shiftDate', shiftDate);
+        }
+
+        if (shiftDate !== today) {
+          localStorage.removeItem('kw_currentUser');
+          localStorage.removeItem('kw_shiftDate');
+          localStorage.removeItem('kw_shiftQNo');
+          setShiftQueueNo(0);
+          setCurrentShiftUser(null);
+        }
+      }
     };
     tick();
     const interval = setInterval(tick, 1000);
@@ -168,13 +192,14 @@ function App() {
             payAwal: row.pay_awal || 'cash',
             cash: row.cash || 0,
             qris: row.qris || 0,
-            shift: row.shift || '-'
+            shift: row.shift || '-',
+            _synced: true
           }));
 
           // Merge local offline-only transactions
           const dbIds = new Set(ct.map(t => t.id));
           const localTxns = JSON.parse(localStorage.getItem('kw_txns') || '[]');
-          const offlineTxns = localTxns.filter(t => !dbIds.has(t.id));
+          const offlineTxns = localTxns.filter(t => !dbIds.has(t.id) && !t._synced);
           const mergedTxns = [...ct, ...offlineTxns].sort((a, b) => (a.no || 0) - (b.no || 0));
 
           setTransactions(mergedTxns);
@@ -190,13 +215,15 @@ function App() {
             startTime: row.start_time || Date.now(),
             tanggal: row.tanggal || '',
             payAwal: row.pay_awal || 'cash',
-            queueNo: row.queue_no || 0
+            queueNo: row.queue_no || 0,
+            _synced: true
           }));
 
           // Merge local offline-only active sessions
           const dbIds = new Set(cs.map(s => s.id));
           const localSessions = JSON.parse(localStorage.getItem('kw_sessions') || '[]');
-          const offlineSessions = localSessions.filter(s => !dbIds.has(s.id));
+          const currentTxns = JSON.parse(localStorage.getItem('kw_txns') || '[]');
+          const offlineSessions = localSessions.filter(s => !dbIds.has(s.id) && !s._synced && !currentTxns.some(t => t.id === s.id));
           const mergedSessions = [...cs, ...offlineSessions];
 
           setActiveSessions(mergedSessions);
@@ -219,11 +246,11 @@ function App() {
             startTime: payload.new.start_time || Date.now(),
             tanggal: payload.new.tanggal || '',
             payAwal: payload.new.pay_awal || 'cash',
-            queueNo: payload.new.queue_no || 0
+            queueNo: payload.new.queue_no || 0,
+            _synced: true
           };
           setActiveSessions(prev => {
-            if (prev.some(x => x.id === s.id)) return prev;
-            const next = [...prev, s];
+            const next = prev.some(x => x.id === s.id) ? prev.map(x => x.id === s.id ? s : x) : [...prev, s];
             safeSetItem('kw_sessions', JSON.stringify(next));
             return next;
           });
@@ -270,11 +297,12 @@ function App() {
             payAwal: payload.new.pay_awal || 'cash',
             cash: payload.new.cash || 0,
             qris: payload.new.qris || 0,
-            shift: payload.new.shift || '-'
+            shift: payload.new.shift || '-',
+            _synced: true
           };
           setTransactions(prev => {
-            if (prev.some(x => x.id === t.id)) return prev;
-            const next = [...prev, t].sort((a, b) => (a.no || 0) - (b.no || 0));
+            const next = prev.some(x => x.id === t.id) ? prev.map(x => x.id === t.id ? t : x) : [...prev, t];
+            next.sort((a, b) => (a.no || 0) - (b.no || 0));
             safeSetItem('kw_txns', JSON.stringify(next));
             return next;
           });
@@ -297,7 +325,8 @@ function App() {
             payAwal: payload.new.pay_awal || 'cash',
             cash: payload.new.cash || 0,
             qris: payload.new.qris || 0,
-            shift: payload.new.shift || '-'
+            shift: payload.new.shift || '-',
+            _synced: true
           };
           setTransactions(prev => {
             const next = prev.some(x => x.id === t.id) ? prev.map(x => x.id === t.id ? t : x) : [...prev, t];
@@ -348,12 +377,13 @@ function App() {
           payAwal: row.pay_awal || 'cash',
           cash: row.cash || 0,
           qris: row.qris || 0,
-          shift: row.shift || '-'
+          shift: row.shift || '-',
+          _synced: true
         }));
 
         // Merge offline-only transactions
         const dbIds = new Set(ct.map(t => t.id));
-        const offlineTxns = transactions.filter(t => !dbIds.has(t.id));
+        const offlineTxns = transactions.filter(t => !dbIds.has(t.id) && !t._synced);
         const finalTxns = [...ct, ...offlineTxns].sort((a, b) => (a.no || 0) - (b.no || 0));
 
         setTransactions(finalTxns);
@@ -369,13 +399,16 @@ function App() {
           nama: row.nama,
           items: row.items || [],
           startTime: row.start_time || Date.now(),
+          tanggal: row.tanggal || '',
           payAwal: row.pay_awal || 'cash',
-          queueNo: row.queue_no || 0
+          queueNo: row.queue_no || 0,
+          _synced: true
         }));
 
         // Merge offline-only active sessions
         const dbIds = new Set(cs.map(s => s.id));
-        const offlineSessions = activeSessions.filter(s => !dbIds.has(s.id));
+        const currentTxns = JSON.parse(localStorage.getItem('kw_txns') || '[]');
+        const offlineSessions = activeSessions.filter(s => !dbIds.has(s.id) && !s._synced && !currentTxns.some(t => t.id === s.id));
         const finalSessions = [...cs, ...offlineSessions];
 
         setActiveSessions(finalSessions);
@@ -436,6 +469,7 @@ function App() {
         const rows = transactions.map(t => ({
           id: t.id,
           no: t.no || 0,
+          queue_no: t.queueNo || 0,
           nama: t.nama,
           tanggal: t.tanggal,
           start_time: t.startTime,
@@ -454,6 +488,11 @@ function App() {
           shift: t.shift || '-'
         }));
         await sb.from('transactions').upsert(rows);
+        setTransactions(prev => {
+          const next = prev.map(t => ({...t, _synced: true}));
+          safeSetItem('kw_txns', JSON.stringify(next));
+          return next;
+        });
       }
 
       if (activeSessions.length > 0) {
@@ -462,9 +501,16 @@ function App() {
           nama: s.nama,
           items: s.items,
           start_time: s.startTime,
+          tanggal: s.tanggal,
+          queue_no: s.queueNo || 0,
           pay_awal: s.payAwal || 'cash'
         }));
         await sb.from('active_sessions').upsert(rows);
+        setActiveSessions(prev => {
+          const next = prev.map(s => ({...s, _synced: true}));
+          safeSetItem('kw_sessions', JSON.stringify(next));
+          return next;
+        });
       }
 
       await sb.from('settings').upsert([
