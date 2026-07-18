@@ -33,9 +33,10 @@ describe('calcOT — standard 1h limit', () => {
     expect(calcOT(119, 60)).toEqual({ otFull: 1, otHalf: 0 }); // 59 min → full
   });
 
-  it('second hour: free for first 10 min', () => {
+  it('second hour: free for first 10m 59s', () => {
     expect(calcOT(120, 60)).toEqual({ otFull: 1, otHalf: 0 }); // 60 min → 1 full
     expect(calcOT(130, 60)).toEqual({ otFull: 1, otHalf: 0 }); // 70 min — grace again
+    expect(calcOT(130.9, 60)).toEqual({ otFull: 1, otHalf: 0 }); // 70.9 min over — still grace for 2nd hour
   });
 
   it('second hour half: 11–40 min into 2nd OT hour', () => {

@@ -16,13 +16,10 @@ export function calcOT(elapsedMin, limitMin) {
   const actualOver = elapsedMin - limitMin;
   if (actualOver < 0 || Math.floor(actualOver) < 11) return { otFull: 0, otHalf: 0 };
 
-  const cycles = Math.floor(actualOver / 60);
-  const remainder = actualOver % 60;
-
-  let otFull = cycles;
+  let otFull = Math.floor(actualOver / 60);
   let otHalf = 0;
   
-  const floorRem = Math.floor(remainder);
+  const floorRem = Math.floor(actualOver % 60);
 
   if (floorRem >= 11 && floorRem <= 40) otHalf = 1;
   else if (floorRem > 40) otFull += 1;

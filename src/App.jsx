@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import LoginPage from './components/LoginPage';
 import { sb } from './supabase';
+import { mergeSyncData } from './lib/sync';
+import { checkShiftExpiration } from './lib/shift';
 import DashboardTab from './components/DashboardTab';
 import HistoryTab from './components/HistoryTab';
 import SettingsTab from './components/SettingsTab';
@@ -147,13 +149,12 @@ function App() {
         let shiftDate = localStorage.getItem('kw_shiftDate');
         const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
         
-        // Auto-fix missing shiftDate for backwards compatibility
         if (!shiftDate) {
           shiftDate = today;
           localStorage.setItem('kw_shiftDate', shiftDate);
         }
 
-        if (shiftDate !== today) {
+        if (checkShiftExpiration(shiftDate, today)) {
           localStorage.removeItem('kw_currentUser');
           localStorage.removeItem('kw_shiftDate');
           localStorage.removeItem('kw_shiftQNo');
@@ -161,6 +162,7 @@ function App() {
           setCurrentShiftUser(null);
         }
       }
+
     };
     tick();
     const interval = setInterval(tick, 1000);
@@ -197,10 +199,8 @@ function App() {
           }));
 
           // Merge local offline-only transactions
-          const dbIds = new Set(ct.map(t => t.id));
           const localTxns = JSON.parse(localStorage.getItem('kw_txns') || '[]');
-          const offlineTxns = localTxns.filter(t => !dbIds.has(t.id) && !t._synced);
-          const mergedTxns = [...ct, ...offlineTxns].sort((a, b) => (a.no || 0) - (b.no || 0));
+          const mergedTxns = mergeSyncData(ct, localTxns).sort((a, b) => (a.no || 0) - (b.no || 0));
 
           setTransactions(mergedTxns);
           safeSetItem('kw_txns', JSON.stringify(mergedTxns));
@@ -220,11 +220,9 @@ function App() {
           }));
 
           // Merge local offline-only active sessions
-          const dbIds = new Set(cs.map(s => s.id));
           const localSessions = JSON.parse(localStorage.getItem('kw_sessions') || '[]');
           const currentTxns = JSON.parse(localStorage.getItem('kw_txns') || '[]');
-          const offlineSessions = localSessions.filter(s => !dbIds.has(s.id) && !s._synced && !currentTxns.some(t => t.id === s.id));
-          const mergedSessions = [...cs, ...offlineSessions];
+          const mergedSessions = mergeSyncData(cs, localSessions, (s) => !currentTxns.some(t => t.id === s.id));
 
           setActiveSessions(mergedSessions);
           safeSetItem('kw_sessions', JSON.stringify(mergedSessions));
@@ -382,9 +380,7 @@ function App() {
         }));
 
         // Merge offline-only transactions
-        const dbIds = new Set(ct.map(t => t.id));
-        const offlineTxns = transactions.filter(t => !dbIds.has(t.id) && !t._synced);
-        const finalTxns = [...ct, ...offlineTxns].sort((a, b) => (a.no || 0) - (b.no || 0));
+        const finalTxns = mergeSyncData(ct, transactions).sort((a, b) => (a.no || 0) - (b.no || 0));
 
         setTransactions(finalTxns);
         safeSetItem('kw_txns', JSON.stringify(finalTxns));
@@ -406,10 +402,8 @@ function App() {
         }));
 
         // Merge offline-only active sessions
-        const dbIds = new Set(cs.map(s => s.id));
         const currentTxns = JSON.parse(localStorage.getItem('kw_txns') || '[]');
-        const offlineSessions = activeSessions.filter(s => !dbIds.has(s.id) && !s._synced && !currentTxns.some(t => t.id === s.id));
-        const finalSessions = [...cs, ...offlineSessions];
+        const finalSessions = mergeSyncData(cs, activeSessions, (s) => !currentTxns.some(t => t.id === s.id));
 
         setActiveSessions(finalSessions);
         safeSetItem('kw_sessions', JSON.stringify(finalSessions));
