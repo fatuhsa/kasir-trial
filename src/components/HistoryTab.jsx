@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { fmtRp } from '../App';
+import { aggregateHistory } from '../lib/history';
 
 const SHIFT_CODE_MAP = { 
   'Akbar':'AK', 'Rani':'RN', 'Monica':'MO', 'Aldy':'AL', 
@@ -25,20 +26,18 @@ function HistoryTab({ transactions, onPrintTxn, onDeleteTxn }) {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
-  const [filterDate, setFilterDate] = useState(getLocalDateString);
+  const [filterMode, setFilterMode] = useState('daily');
+  const [filterDate, setFilterDate] = useState(getLocalDateString());
+  const [filterMonth, setFilterMonth] = useState(getLocalDateString().slice(0, 7));
+  const [filterYear, setFilterYear] = useState(getLocalDateString().slice(0, 4));
 
-  const filtered = transactions.filter(t => t.tanggal === filterDate);
+  const filterValue = filterMode === 'daily' ? filterDate : filterMode === 'monthly' ? filterMonth : filterYear;
 
-  const totalPokok = filtered.reduce((s, t) => s + (t.totalBase || 0), 0);
-  const totalPokokCash = filtered.reduce((s, t) => s + ((t.payAwal || 'cash') === 'cash' ? (t.totalBase || 0) : 0), 0);
-  const totalPokokQris = filtered.reduce((s, t) => s + ((t.payAwal || 'cash') === 'qris' ? (t.totalBase || 0) : 0), 0);
-  const totalTambahan = filtered.reduce((s, t) => s + (t.grandTotal || 0), 0);
-  const totalOTCash = filtered.reduce((s, t) => s + (t.cash || 0), 0);
-  const totalOTQris = filtered.reduce((s, t) => s + (t.qris || 0), 0);
-
-  const totalCashAll = totalPokokCash + totalOTCash;
-  const totalQrisAll = totalPokokQris + totalOTQris;
-  const grandTotal = totalPokok + totalTambahan;
+  const {
+    filtered, totalPokok, totalPokokCash, totalPokokQris, 
+    totalTambahan, totalOTCash, totalOTQris, 
+    totalCashAll, totalQrisAll, grandTotal
+  } = aggregateHistory(transactions, filterMode, filterValue);
 
   const handleExport = () => {
     if (filtered.length === 0) { 
@@ -66,7 +65,7 @@ function HistoryTab({ transactions, onPrintTxn, onDeleteTxn }) {
     const ws = window.XLSX.utils.json_to_sheet(dataRows);
     const wb = window.XLSX.utils.book_new();
     window.XLSX.utils.book_append_sheet(wb, ws, 'Transaksi');
-    window.XLSX.writeFile(wb, `EvrenHouse_${filterDate}.xlsx`);
+    window.XLSX.writeFile(wb, `EvrenHouse_History_${filterValue}.xlsx`);
   };
 
   return (
@@ -75,12 +74,14 @@ function HistoryTab({ transactions, onPrintTxn, onDeleteTxn }) {
         <div className="panel-head flex-wrap gap-2">
           <i className="bi bi-clock-history clr-green"></i><span>Riwayat Transaksi</span>
           <div className="ms-auto d-flex gap-2 flex-wrap align-items-center">
-            <input 
-              type="date" 
-              value={filterDate}
-              onChange={(e) => setFilterDate(e.target.value)}
-              className="cfield-sm" 
-            />
+            <select className="cfield-sm" value={filterMode} onChange={e => setFilterMode(e.target.value)}>
+              <option value="daily">Harian</option>
+              <option value="monthly">Bulanan</option>
+              <option value="yearly">Tahunan</option>
+            </select>
+            {filterMode === 'daily' && <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="cfield-sm" />}
+            {filterMode === 'monthly' && <input type="month" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="cfield-sm" />}
+            {filterMode === 'yearly' && <input type="number" min="2024" max="2099" value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="cfield-sm" style={{width:'80px'}} />}
             <button className="btn-export" onClick={handleExport}><i className="bi bi-download me-1"></i>Export</button>
           </div>
         </div>
