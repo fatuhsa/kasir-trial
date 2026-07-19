@@ -1,11 +1,5 @@
 export function aggregateHistory(transactions, mode, value) {
-  const filtered = transactions.filter(t => {
-    if (!t.tanggal) return false;
-    if (mode === 'daily') return t.tanggal === value;
-    if (mode === 'monthly') return t.tanggal.startsWith(value);
-    if (mode === 'yearly') return t.tanggal.startsWith(value);
-    return false;
-  });
+  const filtered = transactions.filter(t => t.tanggal?.startsWith(value));
 
   const totalPokok = filtered.reduce((s, t) => s + (t.totalBase || 0), 0);
   const totalPokokCash = filtered.reduce((s, t) => s + ((t.payAwal || 'cash') === 'cash' ? (t.totalBase || 0) : 0), 0);
