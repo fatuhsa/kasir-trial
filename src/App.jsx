@@ -38,8 +38,17 @@ export const safeSetItem = (key, value) => {
       console.warn('localStorage quota exceeded, pruning old transactions...');
       try {
         const txns = JSON.parse(localStorage.getItem('kw_txns') || '[]');
-        // Keep last 200 transactions only
-        const pruned = txns.slice(-200);
+        const unsynced = txns.filter(t => !t._synced);
+        const synced = txns.filter(t => t._synced);
+        
+        let pruned;
+        if (unsynced.length >= 200) {
+          pruned = unsynced;
+        } else {
+          const needed = 200 - unsynced.length;
+          pruned = [...unsynced, ...synced.slice(-needed)].sort((a, b) => (a.no || 0) - (b.no || 0));
+        }
+        
         safeSetItem('kw_txns', JSON.stringify(pruned));
         localStorage.setItem(key, value);
       } catch (e2) {

@@ -206,7 +206,7 @@ describe('safeSetItem — QuotaExceededError handling', () => {
   });
 
   it('prunes to last 200 txns on quota exceeded', () => {
-    const txns = Array.from({ length: 350 }, (_, i) => ({ id: `${i}`, no: i }));
+    const txns = Array.from({ length: 350 }, (_, i) => ({ id: `${i}`, no: i, _synced: true }));
     localStorage.setItem('kw_txns', JSON.stringify(txns));
 
     let callCount = 0;
@@ -226,6 +226,47 @@ describe('safeSetItem — QuotaExceededError handling', () => {
     const remaining = JSON.parse(localStorage.getItem('kw_txns'));
     expect(remaining.length).toBe(200);
     expect(remaining[0].no).toBe(150); // kept last 200 of 350
+
+    vi.restoreAllMocks();
+  });
+
+  it('never prunes unsynced transactions, even if they are old', () => {
+    // 0-99 are old offline txns (no _synced)
+    // 100-349 are synced txns (_synced: true)
+    const txns = Array.from({ length: 350 }, (_, i) => ({ 
+      id: `${i}`, 
+      no: i, 
+      ...(i >= 100 ? { _synced: true } : {}) 
+    }));
+    localStorage.setItem('kw_txns', JSON.stringify(txns));
+
+    let callCount = 0;
+    const original = Storage.prototype.setItem;
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function(key, value) {
+      callCount++;
+      if (callCount === 1) {
+        const err = new Error('QuotaExceededError');
+        err.name = 'QuotaExceededError';
+        throw err;
+      }
+      return original.call(this, key, value);
+    });
+
+    safeSetItem('kw_extra', '"x"');
+
+    const remaining = JSON.parse(localStorage.getItem('kw_txns'));
+    // Should keep all 100 unsynced, plus 100 of the newest synced
+    expect(remaining.length).toBe(200);
+    
+    // Check that all 100 unsynced are preserved
+    const unsyncedRemaining = remaining.filter(t => !t._synced);
+    expect(unsyncedRemaining.length).toBe(100);
+    expect(unsyncedRemaining[0].no).toBe(0); // the oldest one is still there!
+
+    // Check that we also kept the latest synced
+    const syncedRemaining = remaining.filter(t => t._synced);
+    expect(syncedRemaining.length).toBe(100);
+    expect(syncedRemaining[0].no).toBe(250); // newest 100 synced (250 to 349)
 
     vi.restoreAllMocks();
   });
